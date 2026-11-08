@@ -9,7 +9,7 @@
       ],
       "body": [
         "The Masoretic Text ends the verse 'according to the number of the sons of Israel' (בְּנֵי יִשְׂרָאֵל).",
-        "4QDeut-j (4Q37), fragment 12, line 14, has the letters בני אלוהים, 'sons of God'. In Abegg's transcription both words are preserved letters. Most of the verse before them, on line 13, is the editor's reconstruction (only בהנחי is preserved there).",
+        "4QDeut-j (4Q37), column 12, line 14 (Abegg's label 12; a plain number marks a column), has the letters בני אלוהים, 'sons of God'. In Abegg's transcription both words are preserved letters. Most of the verse before them, on line 13, is the editor's reconstruction (only בהנחי is preserved there).",
         "The Septuagint (Swete) reads 'according to the number of the angels of God' (ἀγγέλων θεοῦ), which points to a Hebrew text like the scroll's.",
         "The BSB follows the scroll here ('the sons of God'). The KJV and WEB follow the Masoretic Text.",
         "Why it matters: the reading ties the nations to the heavenly 'sons of God' (compare Deut 4:19; Ps 82; Dan 10:13, 20). That is a real textual question, so a claim resting on either reading of this verse has a variant dependency."
@@ -22,7 +22,7 @@
         "4Q51"
       ],
       "body": [
-        "4QSam-a (4Q51), fragment 10a, lines 6 to 9, has a passage the Masoretic Text lacks, placed between 10:27 and 11:1. The lines are shown word by word below from Abegg's transcription.",
+        "4QSam-a (4Q51), column 10a, lines 6 to 9, has a passage the Masoretic Text lacks, placed between 10:27 and 11:1. The lines are shown word by word below from Abegg's transcription.",
         "It tells of Nahash king of the Ammonites oppressing the Gadites and the Reubenites by force and gouging out every right eye, of Israelites beyond the Jordan, and of 'seven thousand men'. Line 9 then reads 'and it happened about a month later' (ויהי כמו חדש) before Nahash goes up against Jabesh.",
         "Several words in this stretch are the editor's reconstruction (shown faded). Read the order of the last line with care: in this transcription the words about reaching Jabesh-gilead follow 'encamped against Jabesh'.",
         "Josephus tells the same story (Antiquities 6.68 to 71 in the standard numbering; 6.5.1 in Whiston's), so a text with this paragraph was known in the first century.",
@@ -161,7 +161,7 @@
         ]
       ]
     },
-    "4Q521 2ii+4:1-14": {
+    "4Q521 f2ii+4:1-14": {
       "scroll": "4Q521",
       "title": "4Q521 fragment 2, column 2 (with fragment 4), lines 1 to 14: the heavens will listen to his anointed one",
       "lines": [
@@ -254,6 +254,10 @@
   "journey_notes": {
     "spirit.joel": "Hebrew and Septuagint compared. In 2:28 (Hebrew 3:1) the Hebrew has 'I will pour out my Spirit' (אֶת־רוּחִי); the Septuagint has 'I will pour out from my Spirit' (ἀπὸ τοῦ πνεύματός μου), which Brenton renders 'of my Spirit'. In 2:29 the Hebrew has 'on the male servants and the female servants'; the Septuagint has 'on my male servants and on the female servants', which Peter takes up in Acts 2:18, adding 'my' to both. In 2:31 the Hebrew calls the day 'great and terrible'; the Septuagint has 'great and glorious' (ἐπιφανῆ), as Acts 2:20 does. At the end of 2:32 the Hebrew has 'among the survivors whom the LORD calls'; the Septuagint has 'and those who have good news announced to them, whom the Lord has called'.",
     "spirit.acts": "The table above is computed, not written: it lines up the Greek of Acts 2:17 to 21 (SBLGNT) with the Septuagint of Joel 2:28 to 32 (Swete) word by word. Words only in Acts are marked; words only in the Septuagint are marked. Read the differences as Peter's (or Luke's) shaping of the quotation for the moment, not as a different text of Joel.",
-    "spirit.1qs": "The Community Rule speaks of a holy spirit that cleanses (3:7; 4:21), of the prophets revealing by God's holy spirit (8:16), and of the community itself as a foundation of a holy spirit (9:3). This is Tier 3: background to the New Testament world, not Scripture. It can illuminate how 'holy spirit' language was used, but it carries no authority."
+    "spirit.1qs": "The Community Rule speaks of a holy spirit that cleanses (3:7; 4:21), of the prophets revealing by God's holy spirit (8:16), and of the community itself as a foundation of a holy spirit (9:3). This is Tier 3: background to the New Testament world, not Scripture. It can illuminate how 'holy spirit' language was used, but it carries no authority.",
+    "signs.isa": "Hebrew and Septuagint compared. Both begin 'The Spirit of the Lord is upon me, because he has anointed me' and send the speaker to bring good news to the poor. Where the Hebrew has 'to bind up the brokenhearted', the Septuagint has 'to heal the broken in heart'. Where the Hebrew ends 61:1 with 'liberty to the captives, and release to the prisoners' (the last phrase is an opening, as of a prison), the Septuagint has 'liberty to the captives, and recovery of sight to the blind'. In 61:2 the Hebrew proclaims 'the year of the LORD's favor and the day of vengeance of our God'; the Septuagint has 'the acceptable year of the Lord, and the day of recompense', without 'of our God'.",
+    "signs.4q521": "4Q521 is Tier 3: a text of the Jewish world, not Scripture. Line 8 takes up Psalm 146:7-8 (prisoners set free, the blind given sight, the bowed down raised). Line 12 echoes Isaiah 61:1 (good news to the poor) and adds what Isaiah 61 does not say: the dead will be made alive. In this fragment it is the Lord who does these things, in the days of 'his anointed one' (line 1). It shows that some Jews before Jesus read Isaiah 61 together with other signs of God's coming. It cannot carry a claim alone.",
+    "signs.luke4": "The table above is computed: it lines up Luke 4:18-19 (SBLGNT) with the Septuagint of Isaiah 61:1-2 (Swete). Luke follows the Septuagint in 'recovery of sight to the blind'. He has no 'to heal the broken in heart' (the Textus Receptus, the KJV's Greek, does have it; see the variant marks on 4:18). He adds 'to send away the oppressed in release', which matches the Septuagint of Isaiah 58:6 (second table). He has 'to proclaim' where the Septuagint has 'to call' the acceptable year, and he stops before 'the day of recompense'. Then Jesus rolls up the scroll and says, 'Today this Scripture is fulfilled in your hearing' (4:21).",
+    "signs.luke7": "Jesus answers John's question with a list of signs. In the Septuagint of Isaiah: the blind see (35:5; 61:1), the lame leap (35:6), the deaf hear (35:5), the dead rise (26:19), and the poor hear good news (61:1). Lepers cleansed has no matching line in these chapters. The pairing of the dead raised with good news to the poor also stands in 4Q521 line 12 (Tier 3 background). Tap a verse to see its own links."
   }
 }

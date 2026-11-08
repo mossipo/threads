@@ -11,13 +11,14 @@
   table { width: 100%; border-collapse: collapse; font-size: .9rem; }
   td, th { border-bottom: 1px solid var(--line); padding: 6px; vertical-align: top; text-align: left; }
   .pass { color: var(--ok); font-weight: 700; } .fail { color: var(--warn); font-weight: 700; }
+  th.group { padding-top: 18px; font-size: 1rem; }
   iframe { width: 390px; height: 700px; border: 1px solid var(--line); position: absolute; left: -9999px; }
 </style>
 </head>
 <body>
 <main>
   <h1>Threads self-test</h1>
-  <p class="small muted">These checks were written by Claude from the Threads specification, because the specification's acceptance test list was not included in what Barry sent. Each check runs against the live data in this copy of the app.</p>
+  <p class="small muted">The first group is the acceptance test list from the Threads specification. The second group holds further checks written while building. Every check runs against the live data in this copy of the app; the data integrity checks compare it with fixtures read straight from the upstream files by <code>build/build_fixtures.py</code>. A full run reads most of the library (about 60 MB) unless it is already stored for offline use.</p>
   <p id="summary" class="weight">Running</p>
   <table><thead><tr><th>#</th><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody id="rows"></tbody></table>
   <p><a href="./">Back to Threads</a></p>

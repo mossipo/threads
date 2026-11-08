@@ -78,7 +78,7 @@ export function loading(msg) { return h('p', { class: 'loading' }, msg || 'Loadi
 export const TYPE_NAMES = { q: 'Direct quotation', a: 'Clear allusion', l: 'Shared key lemma', t: 'Typology', e: 'Thematic echo' };
 export const TYPE_HELP = {
   q: 'A New Testament verse shares 4 or more consecutive words with the Septuagint of this Old Testament verse.',
-  a: 'A 3-word shared run with the Septuagint, or 3 or more rare shared lemmas together with OpenBible votes or a TSK listing.',
+  a: 'A 3-word shared run with the Septuagint, a New Testament and Old Testament pair on Nave\'s quotation list, or 3 or more rare shared lemmas together with OpenBible votes or a TSK listing.',
   l: 'The two passages share at least one rare lemma (used in about 1 verse in 33 or fewer).',
   t: 'Both passages are listed in one typology entry of Nave\'s or Torrey\'s topical index.',
   e: 'Linked by OpenBible or the TSK without enough shared vocabulary for a stronger type.',

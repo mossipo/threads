@@ -24,6 +24,18 @@ def main():
     out = {}
     for bi, osis, *_ in BOOKS:
         d = read_json(f"orig/{osis}.json")["v"]
+        # lemma sequence per verse (Strong's numbers without the H or G), for the claim test's word-order rules.
+        # Hebrew words marked X or R by STEPBible are left out, as in the claim test.
+        seq = {}
+        for key, ent in d.items():
+            nums = []
+            for w in ent["w"]:
+                if bi < NT_START and w[6].startswith(("X", "R")):
+                    continue
+                p = plain(w[3])
+                nums.append(int(p[1:]) if p else 0)
+            seq[key] = nums
+        write_json(f"idx/seq/{osis}.json", seq)
         for key, ent in d.items():
             c, v = map(int, key.split(":"))
             bits = 0

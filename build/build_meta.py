@@ -26,14 +26,25 @@ JOURNEYS = {
             {"kind": "scroll", "passages": ["1QS 3:6-9", "1QS 4:20-23", "1QS 8:14-16", "1QS 9:3-5"],
              "title": "The Community Rule's 'holy spirit' (Tier 3)", "note": "spirit.1qs"},
         ],
-    }
+    },
+    "signs": {
+        "title": "The messianic signs",
+        "summary": "Isaiah 61 in Hebrew and Greek, 4Q521 beside it, then Jesus reading Isaiah at Nazareth and answering John.",
+        "steps": [
+            {"kind": "heb-lxx", "ref": "Isa.61.1-Isa.61.2", "title": "The anointed herald: Isaiah 61:1-2, Hebrew and Septuagint", "note": "signs.isa"},
+            {"kind": "scroll", "passages": ["4Q521 f2ii+4:1-14"], "title": "4Q521: the Lord's anointed and the signs (Tier 3)", "note": "signs.4q521"},
+            {"kind": "nt-lxx", "ref": "Luke.4.16-Luke.4.21", "quote": "Luke.4.18-Luke.4.19", "source": "Isa.61.1-Isa.61.2",
+             "extra": [["Luke.4.18", "Isa.58.6"]], "title": "Nazareth: Jesus reads Isaiah (Luke 4:16-21)", "note": "signs.luke4"},
+            {"kind": "passage", "ref": "Luke.7.22", "context": "Luke.7.18-Luke.7.23", "title": "The signs reported to John (Luke 7:22)", "note": "signs.luke7"},
+        ],
+    },
 }
 
 
 def fill_missing():
     """Every per-book folder gets a file for every book, empty when there is no data, so the app never asks for a missing file."""
     from common import BOOKS, NT_START
-    for folder, ot_only in (("text", False), ("orig", False), ("xref", False), ("lxx", True), ("dss/bib", True), ("anf/idx", False)):
+    for folder, ot_only in (("text", False), ("orig", False), ("lxx", True), ("dss/bib", True), ("anf/idx", False)):
         for bi, osis, *_ in BOOKS:
             if ot_only and bi >= NT_START:
                 continue

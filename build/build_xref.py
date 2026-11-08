@@ -282,6 +282,37 @@ def load_typology():
     return pairs, entries
 
 
+def load_nave_quotations():
+    """Pairs from Nave's QUOTATIONS AND ALLUSIONS (New Testament passage, then the Old Testament passages it uses)."""
+    eids = set()
+    with open(os.path.join(SRC, "topical/dist/nave/entries.jsonl"), encoding="utf-8") as f:
+        for line in f:
+            d = json.loads(line)
+            if d["topicId"] == "nave:quotations-and-allusions":
+                eids.add(d["id"])
+    seq = []
+    with open(os.path.join(SRC, "topical/dist/nave/assertions.jsonl"), encoding="utf-8") as f:
+        for line in f:
+            d = json.loads(line)
+            if d["entryId"] not in eids:
+                continue
+            b = topical_book(d["book"])
+            if not b or d.get("verseStart") is None:
+                continue
+            vs = d["verseStart"]
+            a = vid(b[0], d["chapterStart"], vs)
+            z = vid(b[0], d.get("chapterEnd") or d["chapterStart"], d.get("verseEnd") or vs)
+            seq.append((a, max(a, z)))
+    pairs = set()
+    nt = None
+    for a, z in seq:
+        if vid_parts(a)[0] >= NT_START:
+            nt = (a, z)
+        elif nt:
+            pairs.add((nt, (a, z)))
+    return pairs
+
+
 # ------------------------------------------------------------------ main
 def main():
     print("loading verse data")
@@ -335,14 +366,16 @@ def main():
     ob = load_openbible()
     tsk = load_tsk()
     typo, typo_entries = load_typology()
-    print("  openbible", len(ob), "tsk", len(tsk), "typology pairs", len(typo))
+    naveq = load_nave_quotations()
+    print("  openbible", len(ob), "tsk", len(tsk), "typology pairs", len(typo), "Nave quotation pairs", len(naveq))
 
     # assemble raw evidence per source verse, then merge links whose target ranges overlap
     raw = defaultdict(list)  # source -> list of [b0, b1, evidence]
+    # OpenBible votes are kept per direction: Vf from the source verse, Vr listed from the other verse
     for (a, rng), votes in ob.items():
-        raw[a].append([rng[0], rng[1], {"V": votes}])
+        raw[a].append([rng[0], rng[1], {"Vf": votes}])
         if rng[0] == rng[1]:
-            raw[rng[0]].append([a, a, {"V": votes}])
+            raw[rng[0]].append([a, a, {"Vr": votes}])
     for (a, rng) in tsk:
         raw[a].append([rng[0], rng[1], {"T": 1}])
         raw[rng[0]].append([a, a, {"T": 1}])
@@ -351,6 +384,11 @@ def main():
     for (nk, ok), q in quotes.items():
         raw[nk].append([ok, ok, {"Q": q}])
         raw[ok].append([nk, nk, {"Q": q}])
+    for (nt, ot) in naveq:
+        for k in range(nt[0], min(nt[1], nt[0] + 5) + 1):
+            raw[k].append([ot[0], ot[1], {"N": 1}])
+        for k in range(ot[0], min(ot[1], ot[0] + 5) + 1):
+            raw[k].append([nt[0], nt[1], {"N": 1}])
     links = {}
     for a, items in raw.items():
         items.sort(key=lambda x: (x[0], x[1]))
@@ -360,10 +398,13 @@ def main():
                 m = merged[-1]
                 m[1] = max(m[1], b1)
                 e = m[2]
-                if "V" in ev:
-                    e["V"] = max(e.get("V", ev["V"]), ev["V"])
+                for vk in ("Vf", "Vr"):
+                    if vk in ev:
+                        e[vk] = max(e.get(vk, ev[vk]), ev[vk])
                 if "T" in ev:
                     e["T"] = 1
+                if "N" in ev:
+                    e["N"] = 1
                 if "Y" in ev:
                     e.setdefault("Y", ev["Y"])
                 if "Q" in ev and (not e.get("Q") or ev["Q"][0] > e["Q"][0]):
@@ -394,13 +435,15 @@ def main():
         q = ev.get("Q")
         if q:
             Q = min(60, 10 * q[0])
-        votes = ev.get("V")
+        vf, vr = ev.get("Vf"), ev.get("Vr")
+        votes = max([x for x in (vf, vr) if x is not None], default=None)
         V = 0 if not votes or votes <= 0 else min(30, round(10 * math.log10(1 + votes)))
         T = 15 if ev.get("T") else 0
-        score = Q + L + V + T
+        N = 20 if ev.get("N") else 0
+        score = Q + L + V + T + N
         if q and q[0] >= 4 and a_nt != b_nt:
             typ = "q"
-        elif (q and q[0] == 3 and a_nt != b_nt) or (len(key) >= 3 and sum(key) >= 15 and (V >= 10 or T)):
+        elif (q and q[0] == 3 and a_nt != b_nt) or (N and a_nt != b_nt) or (len(key) >= 3 and sum(key) >= 15 and (V >= 10 or T)):
             typ = "a"
         elif ev.get("Y"):
             typ = "t"
@@ -411,15 +454,15 @@ def main():
         if score <= 0 and not ev.get("Y"):
             continue
         type_count[typ] += 1
+        # record: start, end, type, score, Q, L, V, T, shared lemmas, [votes from this verse, votes from the other],
+        #         quotation run, typology entry, N
         rec = [b0, b1, typ, score, Q, L, V, T,
                [[p, round(w, 1)] for w, p in shared[:6]],
-               votes if votes is not None else None]
-        if q:
-            rec.append([q[0], q[3]])
-        else:
-            rec.append(None)
-        if ev.get("Y"):
-            rec.append(ev["Y"])
+               [vf, vr] if votes is not None else None,
+               [q[0], q[3]] if q else None,
+               ev.get("Y"), N]
+        while len(rec) > 10 and rec[-1] in (None, 0):
+            rec.pop()  # trailing empty fields are left out to save space
         per_verse[a].append(rec)
 
     print("  types", dict(type_count))
@@ -431,13 +474,17 @@ def main():
         recs = recs[:32]
         kept += len(recs)
         b, c, v = vid_parts(a)
-        per_book[b][f"{c}:{v}"] = recs
+        per_book[b].setdefault(c, {})[f"{c}:{v}"] = recs
+    # one file per chapter, so a passage loads only its own chapter's links
+    import shutil
+    shutil.rmtree(os.path.join(DATA, "xref"), ignore_errors=True)
     for bi, osis, *_ in BOOKS:
-        sizes += write_json(f"xref/{osis}.json", {"b": osis, "v": per_book.get(bi, {})})
+        for c, d in sorted(per_book.get(bi, {}).items()):
+            sizes += write_json(f"xref/{osis}/{c}.json", {"b": osis, "c": c, "v": d})
     print("  links kept", kept, "bytes", sizes)
 
-    # typology entry labels (Torrey's em dashes become colons; see sources.json)
-    labels = {eid: [t, re.sub(r"\s*" + chr(0x2014) + r"\s*", ": ", raw)] for eid, (t, raw) in typo_entries.items()}
+    # typology entry labels (em dashes in non-biblical sources are shown as spaced hyphens; see sources.json)
+    labels = {eid: [t, re.sub(r"\s*" + chr(0x2014) + r"\s*", " - ", raw)] for eid, (t, raw) in typo_entries.items()}
     write_json("idx/typology.json", labels)
 
     # Septuagint equivalents for Word Threads

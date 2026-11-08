@@ -4,7 +4,7 @@ import { BOOKS, bookOsis, parts, vid, keyOf, NT_START, versesIn, shiftVerse } fr
 
 const mem = new Map();
 const BASE = new URL('../data/', import.meta.url).href;
-export const DATA_CACHE = 'threads-data-v1';
+export const DATA_CACHE = 'threads-data-v2';
 
 export async function getJSON(path) {
   if (mem.has(path)) return mem.get(path);
@@ -45,7 +45,9 @@ export async function chapters() { return (await meta.verses()).chapters; }
 const bookFile = (dir, v) => getJSON(`${dir}/${bookOsis(parts(v)[0])}.json`);
 export async function text(v) { return (await bookFile('text', v)).v[keyOf(v)] || null; }
 export async function orig(v) { return (await bookFile('orig', v)).v[keyOf(v)] || null; }
-export async function xrefs(v) { return (await bookFile('xref', v)).v[keyOf(v)] || []; }
+export async function xrefs(v) { const [b, c] = parts(v); const d = await tryJSON(`xref/${bookOsis(b)}/${c}.json`); return d ? d.v[keyOf(v)] || [] : []; }
+// lemma sequence of a verse (Strong's numbers without H or G), as the claim test reads word order
+export async function seq(v) { const d = await tryJSON(`idx/seq/${bookOsis(parts(v)[0])}.json`); return d ? d[keyOf(v)] || null : null; }
 export async function lxx(v) { if (parts(v)[0] >= NT_START) return null; const d = await tryJSON(`lxx/${bookOsis(parts(v)[0])}.json`); return d ? d.v[keyOf(v)] || null : null; }
 export async function dssBib(v) { const d = await tryJSON(`dss/bib/${bookOsis(parts(v)[0])}.json`); return d ? d.v[keyOf(v)] || [] : []; }
 export async function anfRefs(v) { const d = await tryJSON(`anf/idx/${bookOsis(parts(v)[0])}.json`); return d ? d[keyOf(v)] || [] : []; }

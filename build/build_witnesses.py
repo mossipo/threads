@@ -23,14 +23,19 @@ from common import BOOKS, BY_OSIS, BY_STEP, BY_NAME, SRC, vid, vid_parts, write_
 
 # ------------------------------------------------------------------ Septuagint
 def build_lxx():
-    own = {}
+    # Swete's own numbering for each grid verse: find the same Greek text in swete-greek.tsv, in the same book,
+    # choosing the copy nearest the previous match when a verse text occurs more than once (refrains, parallels)
+    own = defaultdict(list)          # book -> [(c, v, text)] in file order
+    where = defaultdict(lambda: defaultdict(list))  # book -> text -> [positions]
     with open(os.path.join(SRC, "lxx/swete-greek.tsv"), encoding="utf-8") as f:
         r = csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
         next(r)
         for row in r:
             book, c, v, text = row[:4]
-            own.setdefault(text.strip(), f"{c}:{v}")
+            where[book][text.strip()].append(len(own[book]))
+            own[book].append((c, v, text.strip()))
     per_book = defaultdict(dict)
+    last = defaultdict(int)
     with open(os.path.join(SRC, "lxx/swete-greek-english-grid.tsv"), encoding="utf-8") as f:
         r = csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
         next(r)
@@ -40,9 +45,14 @@ def build_lxx():
                 continue
             osis = BY_STEP[book][1]
             rec = [greek.strip(), brenton.strip()]
-            lxx_ref = own.get(greek.strip())
-            if lxx_ref and lxx_ref != f"{c}:{v}":
-                rec.append(lxx_ref)
+            lb = book if book in where else {"Dan": "Dat"}.get(book, book)
+            cands = where[lb].get(greek.strip(), []) if greek.strip() else []
+            if cands:
+                pos = min(cands, key=lambda i: (abs(i - (last[lb] + 1)), i))
+                last[lb] = pos
+                lc, lv, _ = own[lb][pos]
+                if (lc, lv) != (c, v):
+                    rec.append(f"{lc}:{lv}")
             per_book[osis][f"{c}:{v}"] = rec
     n = 0
     for osis, d in per_book.items():
@@ -98,7 +108,7 @@ def build_topics():
         with open(os.path.join(SRC, f"topical/dist/{src}/entries.jsonl"), encoding="utf-8") as f:
             for line in f:
                 d = json.loads(line)
-                text = re.sub(r"\s*" + chr(0x2014) + r"\s*", ": ", d["rawText"])  # Torrey's dashes become colons
+                text = no_dash(d["rawText"])  # em dashes in non-biblical sources become spaced hyphens
                 entries[d["topicId"]].append([d["id"], text, refs.get(d["id"], [])])
     shards = defaultdict(dict)
     for tid, es in entries.items():

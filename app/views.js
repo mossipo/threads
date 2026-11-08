@@ -5,7 +5,8 @@ import * as R from './refs.js';
 import * as Trail from './trail.js';
 import { linksFor, explain, summary as linkSummary, aiReason } from './links.js';
 import { drawConstellation } from './graph.js';
-import { runClaim } from './claim.js';
+import { runClaim, namedWork } from './claim.js';
+import { editionInfo } from './editions.js';
 
 const view = () => document.getElementById('view');
 const SETTINGS_KEY = 'threads.settings.v1';
@@ -24,7 +25,8 @@ async function verseBlock(v, opts = {}) {
   const heb = isHebWord(v);
   const box = h('div', { class: `verse${opts.ctx ? ' ctx' : ''}`, id: `v${v}`, 'data-v': v });
   const [, , vn] = R.parts(v);
-  const bsbLine = h('div', { class: 'bsb' }, h('span', { class: 'vn' }, vn));
+  if (vn === 0) box.classList.add('title-block');
+  const bsbLine = h('div', { class: 'bsb' }, h('span', { class: 'vn' }, vn === 0 ? 'Title' : vn));
   if (t && t.bsb) {
     t.bsb.forEach((seg, i) => {
       if (!seg[1]) { bsbLine.append(seg[0]); return; }
@@ -63,6 +65,18 @@ async function verseBlock(v, opts = {}) {
     if (!heb && o.g && settings.orig) box.append(h('div', { class: 'grk-text' }, o.g));
   } else if (o && o.g) {
     box.append(h('div', { class: 'alt' }, 'No STEPBible word data at this verse number. SBLGNT: ', h('span', { class: 'grk-text' }, o.g)));
+  }
+  // edition flags (TAGNT): whole verses or passages that printed editions treat differently
+  if (!heb) {
+    const info = await editionInfo(v, o);
+    if (info) {
+      box.append(h('div', { class: 'edflag', 'data-editions': info.inList.join('|') },
+        h('b', null, 'Edition flag (TAGNT). '), info.lines.join(' '), ' ',
+        h('span', null, `In: ${info.inList.join(', ') || 'no listed edition'}.`), ' ',
+        info.missing.length ? h('span', null, `Not listed: ${info.missing.join(', ')}.`) : null, ' ',
+        h('span', null, info.sbl === 'brackets' ? 'The SBLGNT prints it in double brackets.' : info.sbl === 'absent' ? 'Not in the SBLGNT.' : ''),
+        cite(`STEPBible TAGNT, ${R.label(v)} (editions column and word types); SBLGNT`, ['stepbible', 'sblgnt'])));
+    }
   }
   // witnesses and tools
   const tools = h('div', { class: 'vtools' });
@@ -141,7 +155,7 @@ async function bsbWordSheet(v, seg, o, hr) {
 function lxxSheet(v, lx) {
   openSheet(`Septuagint, ${R.label(v)}`, [
     h('p', null, tier(2), 'Textual witness: what the Greek translators read.'),
-    h('div', { class: 'card box-t2' }, h('div', { class: 'grk-text' }, lx[0]), h('p', null, lx[1]),
+    h('div', { class: 'card box-t2' }, lx[0] ? h('div', { class: 'grk-text' }, lx[0]) : nodata('No Greek at this verse in the Swete transcription. Brenton\'s English is shown.'), h('p', null, lx[1]),
       cite(`Swete, ${R.label(v)}${lx[2] ? ` (Swete numbering ${lx[2]})` : ''}; Brenton's English`, ['lxx'])),
   ]);
 }
@@ -149,15 +163,15 @@ async function dssSheet(v, recs) {
   const ai = await D.meta.ai();
   const note = ai.dss_notes[R.osisOf(v)];
   const o = await D.orig(v);
-  const body = [h('p', null, tier(2), 'Biblical scrolls compared word by word with the Masoretic Text (letters only).'), dssLegend()];
+  const body = [h('p', null, tier(2), 'Biblical scrolls compared word by word with the Masoretic Text (letters only), shown in English.'), dssLegend()];
   if (note) body.push(dssNote(note, ai));
   for (const r of recs) body.push(dssWitness(v, r, o));
   body.push(cite(`ETCBC/dss (Abegg), ${R.label(v)}; comparison by the Threads build. Non-commercial license.`, ['dss']));
   openSheet(`Dead Sea Scrolls, ${R.label(v)}`, body);
 }
 function dssLegend() {
-  return h('div', { class: 'legend-row' }, ...[['s', 'same'], ['o', 'spelling only'], ['c', 'adds or lacks "and"'], ['d', 'different word'], ['p', 'not in the Masoretic Text'], ['r', 'reconstructed by the editor']]
-    .map(([k, t]) => h('span', null, h('span', { class: `sw ${k}` }, 'אבג'), t)));
+  return h('div', { class: 'legend-row' }, ...[['s', 'same as the Masoretic Text'], ['o', 'spelling only'], ['c', 'adds or lacks "and"'], ['d', 'different word'], ['p', 'not in the Masoretic Text'], ['r', '[restored by the editor]']]
+    .map(([k, t]) => h('span', null, h('span', { class: `ew ${k}` }, k === 'r' ? '[word]' : 'word'), t)));
 }
 function dssNote(note, aiData) {
   const box = ai([h('p', null, h('b', null, note.title)), ...note.body.map((p) => h('p', null, p)), h('p', { class: 'small' }, note.editions)], aiData._by);
@@ -170,20 +184,52 @@ function leonLevy(scroll) {
   if (/^\d+Q/.test(scroll)) return h('a', { href: `https://www.deadseascrolls.org.il/explore-the-archive/manuscript/${encodeURIComponent(scroll)}-1`, target: '_blank', rel: 'noopener' }, 'Images (Leon Levy library, online)');
   return null;
 }
+// standard sigla of the scrolls Threads names in its notes and journeys
+export const SIGLA = { '1Qisaa': '1QIsa-a', '1Q8': '1QIsa-b', '4Q37': '4QDeut-j', '4Q51': '4QSam-a', '11Q5': '11QPs-a', '4Q71': '4QJer-b', '4Q58': '4QIsa-d', '4Q521': '4QMessianic Apocalypse' };
+// Abegg's labels: a plain number is a column, f marks a fragment (f2ii = fragment 2, column ii)
+export function dssLoc(locs) {
+  const by = new Map();
+  for (const l of locs) { const i = l.lastIndexOf(':'); const f = l.slice(0, i); if (!by.has(f)) by.set(f, []); by.get(f).push(+l.slice(i + 1)); }
+  return [...by].map(([f, ns]) => {
+    ns.sort((a, b) => a - b);
+    const lab = /^f/.test(f) ? `frag. ${f.slice(1).replace(/^(\d+)([ivx]+)(?:\+(\d+))?$/, (x, n, cl, more) => `${n} col. ${cl}${more ? ` with frag. ${more}` : ''}`)}` : `col. ${f}`;
+    const lines = ns.length === 1 ? `line ${ns[0]}` : (ns[ns.length - 1] - ns[0] === ns.length - 1 ? `lines ${ns[0]}-${ns[ns.length - 1]}` : `lines ${ns.join(', ')}`);
+    return `${lab}, ${lines}`;
+  }).join('; ');
+}
+export const scrollName = (id) => (SIGLA[id] ? `${id} (${SIGLA[id]})` : id);
+const clean = (g) => (g || '').replace(/\//g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
 function dssWitness(v, r, o) {
   const mtw = o ? o.w.filter((w) => !/^[XR]/.test(w[6])) : [];
-  const line = h('div', { class: 'heb-text' });
-  for (const w of r.w) line.append(h('span', { class: `sw ${w[1]}${w[4] ? ' part' : ''}`, title: w[1] === 'r' ? 'reconstructed' : '' }, w[0]), ' ');
+  // English first: each scroll word in English, with the differences marked
+  const eng = h('div', { class: 'dss-eng' });
+  const heb = h('div', { class: 'heb-text' });
+  for (const w of r.w) {
+    const mt = mtw[w[3]];
+    const dict = w[2] && w[2].length ? clean(w[2][0][1]) : '';
+    let text; let cls = `ew ${w[1]}`; let tip = w[0];
+    if (w[1] === 'd') { text = dict || '(another word)'; tip += ` where the Masoretic Text has ${mt ? `${mt[0]} "${clean(mt[2])}"` : 'another word'}`; }
+    else if (w[1] === 'p') { text = dict || '(a word)'; tip += ': not in the Masoretic Text'; }
+    else if (w[1] === 'r') { text = mt ? clean(mt[2]) : (dict || '...'); tip += ': reconstructed by the editor'; }
+    else { text = mt ? clean(mt[2]) : (dict || w[0]); if (w[1] === 'o') tip += ': same word, spelled differently'; if (w[1] === 'c') tip += ': same word, with or without "and"'; }
+    if (w[4]) cls += ' part';
+    eng.append(h('span', { class: cls, title: tip }, w[1] === 'r' ? `[${text}]` : text), ' ');
+    heb.append(h('span', { class: `sw ${w[1]}${w[4] ? ' part' : ''}`, title: w[1] === 'r' ? 'reconstructed' : '' }, w[0]), ' ');
+  }
   const diffs = [];
   for (const w of r.w) {
-    if (w[1] === 'd') diffs.push(h('li', null, `Scroll ${w[0]} where the Masoretic Text has ${mtw[w[3]] ? `${mtw[w[3]][0]} ("${mtw[w[3]][2].replace(/\//g, '')}")` : 'another word'}${w[2] && w[2].length ? `; dictionary match: ${w[2].map((x) => x[1]).join(' or ')}` : ''}.`));
-    if (w[1] === 'p') diffs.push(h('li', null, `Scroll adds ${w[0]}${w[2] && w[2].length ? ` (dictionary match: ${w[2].map((x) => x[1]).join(' or ')})` : ''}.`));
-    if (w[1] === 'c') diffs.push(h('li', null, `Scroll ${w[0]}: same word with or without "and".`));
+    const mt = mtw[w[3]];
+    if (w[1] === 'd') diffs.push(h('li', null, h('b', null, w[2] && w[2].length ? clean(w[2][0][1]) : 'another word'), ` where the Masoretic Text has "${mt ? clean(mt[2]) : 'another word'}" (scroll ${w[0]}${mt ? `, Masoretic ${mt[0]}` : ''})${w[2] && w[2].length > 1 ? `; other dictionary matches: ${w[2].slice(1).map((x) => clean(x[1])).join(', ')}` : ''}.`));
+    if (w[1] === 'p') diffs.push(h('li', null, 'Adds ', h('b', null, w[2] && w[2].length ? clean(w[2][0][1]) : 'a word'), ` (scroll ${w[0]}), not in the Masoretic Text.`));
+    if (w[1] === 'c') diffs.push(h('li', null, `"${mt ? clean(mt[2]) : w[0]}": the same word with or without "and" (scroll ${w[0]}).`));
   }
-  for (const [j, g] of r.m) diffs.push(h('li', null, `No scroll word for Masoretic ${mtw[j] ? mtw[j][0] : ''} ("${(g || '').replace(/\//g, '')}"): omitted or damaged.`));
-  return h('div', { class: 'card box-t2' }, h('div', { class: 'row' }, h('b', null, r.s), h('span', { class: 'small muted' }, r.loc.join(', ')), leonLevy(r.s)),
-    line, diffs.length ? h('ul', { class: 'small' }, diffs) : h('div', { class: 'small muted' }, 'No word differences in the preserved letters (spelling aside).'),
-    h('div', { class: 'small muted' }, 'English for differing words comes from a dictionary-form match and may be imprecise.'));
+  for (const [j, g] of r.m) diffs.push(h('li', null, `No scroll word for "${clean(g)}"${mtw[j] ? ` (Masoretic ${mtw[j][0]})` : ''}: not preserved, or not there.`));
+  return h('div', { class: 'card box-t2 dss-card', 'data-scroll': r.s },
+    h('div', { class: 'row' }, h('b', { class: 'dss-cite' }, `${scrollName(r.s)}, ${dssLoc(r.loc)}`), leonLevy(r.s)),
+    eng,
+    diffs.length ? h('ul', { class: 'small' }, diffs) : h('div', { class: 'small muted' }, 'No word differences in the preserved letters (spelling aside).'),
+    h('details', null, h('summary', { class: 'small' }, 'Hebrew of the scroll'), heb),
+    h('div', { class: 'small muted' }, 'English is word by word: the BSB-aligned gloss of the matching Masoretic word, or a dictionary-form match for a differing word, which may be imprecise. Square brackets mark letters the editor restored.'));
 }
 async function anfSheet(v, refs) {
   openSheet(`Early church on ${R.label(v)}`, loading());
@@ -222,7 +268,12 @@ export async function renderReader(a, z) {
     for (const v of after) list.append(await verseBlock(v, { ctx: true }));
   } }, 'Show 3 verses of context on each side');
   setView(head, toggles, h('p', null, ctxBtn), list, nav(a, z, await D.chapters()));
-  for (const v of vs) list.append(await verseBlock(v));
+  for (const v of vs) {
+    // a Psalm title stands before verse 1 (in the Hebrew it is part of the text, often verse 1)
+    const [b, c, n] = R.parts(v);
+    if (n === 1 && b === R.bookIndex('Ps') && await D.text(R.vid(b, c, 0))) list.append(await verseBlock(R.vid(b, c, 0)));
+    list.append(await verseBlock(v));
+  }
   Trail.record('passage', R.rangeOsis(a, z), R.rangeLabel(a, z));
 }
 function nav(a, z, chs) {
@@ -321,7 +372,7 @@ async function edgeSheet(n) {
   const rows = await explain(n);
   const table = h('table', { class: 'score-table' });
   for (const [k, pts, why] of rows) table.append(h('tr', null, h('td', null, h('b', null, k), h('div', { class: 'small muted' }, why)), h('td', null, pts === '' ? '' : String(pts))));
-  table.append(h('tr', null, h('td', null, h('b', null, 'Score = Q + L + V + T')), h('td', null, h('b', null, String(n.score)))));
+  table.append(h('tr', null, h('td', null, h('b', null, 'Score = Q + L + V + T + N')), h('td', null, h('b', null, String(n.score)))));
   const body = [h('p', null, h('span', { class: `type-pill ${n.typ}` }, TYPE_NAMES[n.typ]), ' ', h('span', { class: 'small' }, TYPE_HELP[n.typ])), table];
   if (n.typo) {
     const ty = await D.meta.typology();
@@ -340,7 +391,7 @@ async function edgeSheet(n) {
   body.push(h('div', { class: 'row' },
     h('button', { class: 'btn', onclick: () => { Trail.record('link', `${R.osisOf(n.from)}|${R.rangeOsis(n.b0, n.b1)}`, `${R.label(n.from)} to ${R.rangeLabel(n.b0, n.b1)}`, { summary: linkSummary(n) }); toast('Added to your trail'); } }, 'Add to trail'),
     h('a', { class: 'btn', href: `#/web/${R.rangeOsis(n.b0, n.b1)}` }, 'Make the other end the centre')));
-  body.push(cite(`Scores from: OpenBible.info votes, TSK (CrossWire), STEPBible lemmas, MACULA Hebrew Septuagint equivalents, SBLGNT and Swete wording. ${aiData ? '' : ''}`, ['openbible', 'tsk', 'stepbible', 'macula_hebrew', 'sblgnt', 'lxx']));
+  body.push(cite('Scores from: OpenBible.info votes, TSK (CrossWire), Nave\'s quotation list, STEPBible lemmas, MACULA Hebrew Septuagint equivalents, SBLGNT and Swete wording.', ['openbible', 'tsk', 'topical', 'stepbible', 'macula_hebrew', 'sblgnt', 'lxx']));
   setSheetBody(body);
 }
 
@@ -443,7 +494,7 @@ function pinSave(s) { try { localStorage.setItem(PIN_KEY, JSON.stringify(s)); } 
 export async function renderTest(initial, refHint) {
   const input = h('textarea', { placeholder: 'Type a claim, e.g. "God pours out his Spirit on all flesh"', 'aria-label': 'Claim' }, initial || '');
   const out = h('div');
-  const pinIn = h('input', { type: 'text', placeholder: 'Pin a text: Joel 2:28, LXX Joel 2:28, or 1QS 4:21' });
+  const pinIn = h('input', { type: 'text', placeholder: 'Pin a text: Joel 2:28, LXX Joel 2:28, 1QS 4:21, 1 Enoch 1:9', 'aria-label': 'Text to pin' });
   const pinAs = h('select', null, h('option', { value: 'support' }, 'as support'), h('option', { value: 'tension' }, 'as tension'));
   const pinList = h('div', { class: 'chips' });
   const store = pinStore();
@@ -458,18 +509,22 @@ export async function renderTest(initial, refHint) {
     const s = pinIn.value.trim();
     if (!s) return;
     const c = cur();
+    const named = namedWork(s);
     const sm = /^(\d+Q\w*|CD|Mas\w*|Mur\w*|XHev\S*)\s+(\S+)$/i.exec(s);
     const lx = /^(LXX|Septuagint)\s+(.+)$/i.exec(s);
-    if (sm) {
+    if (named) {
+      // a named work outside Scripture keeps its tier whether or not Threads carries its text
+      c.pins.push({ tier: named.tier, label: s, as: pinAs.value, work: named.name, bundled: named.bundled });
+    } else if (sm) {
       // a biblical scroll is a Tier 2 witness; any other scroll is Tier 3 background
       const list = await D.meta.scrolls();
       const row = list.find((r) => r[0].toLowerCase() === sm[1].toLowerCase());
       const tierN = row && row[2] > row[1] * 0.5 ? 2 : 3;
-      c.pins.push({ tier: tierN, label: s, as: pinAs.value });
+      c.pins.push({ tier: tierN, label: s, as: pinAs.value, work: row ? `Dead Sea Scroll ${row[0]}` : 'Dead Sea Scroll', bundled: !!row });
     } else if (lx) {
       const r = R.parseHuman(lx[2], await D.chapters());
       if (!r) { toast('Could not read that reference'); return; }
-      c.pins.push({ tier: 2, label: `Septuagint ${R.rangeLabel(r[0], r[1])}`, as: pinAs.value });
+      c.pins.push({ tier: 2, label: `Septuagint ${R.rangeLabel(r[0], r[1])}`, as: pinAs.value, work: 'Septuagint', bundled: true });
     } else {
       const r = R.parseHuman(s, await D.chapters());
       if (!r) { toast('Could not read that reference'); return; }
@@ -496,45 +551,99 @@ export async function renderTest(initial, refHint) {
   if (refHint) { const r = R.parseOsisRange(refHint); if (r) pinIn.value = R.rangeLabel(r[0], r[1]); }
   if (initial) run();
 }
-async function claimReport(res, c, rerun) {
-  const parts = [h('div', { class: 'card' }, h('div', { class: 'weight' }, res.weight),
-    h('div', { class: 'small muted' }, `Words searched: ${res.kws.map((k) => `${k.k} (${k.df} verses)`).join(', ') || 'none'}. Lemmas underneath: ${res.lemmas.map((l) => `${l.lemma} ${l.pk} "${l.gloss}"`).join(', ') || 'none'}. Topics: ${res.topics.map((t) => `${t.title} (${t.src === 'nave' ? 'Nave' : 'Torrey'})`).join('; ') || 'none'}.`))];
-  for (const w of res.warnings) parts.push(h('div', { class: 'warnbox' }, w));
-  const item = async (e, kind) => {
-    const v = e.v;
-    const tx = await D.bsbText(v);
-    const why = [];
-    if (e.pinned) why.push('pinned by you');
-    if (e.kw && e.kw.size) why.push(`words: ${[...e.kw.keys()].join(', ')}`);
-    if (e.lemma && e.lemma.size) why.push(`lemmas: ${[...e.lemma.keys()].join(', ')}`);
-    if (e.topic && e.topic.length) why.push(`topic: ${[...new Set(e.topic.map((t) => `${t.title} (${t.src === 'nave' ? 'Nave' : 'Torrey'}): "${t.text.slice(0, 80)}"`))].slice(0, 2).join('; ')}`);
-    if (e.graph && e.graph.length) why.push(`linked from ${e.graph.slice(0, 2).map((g) => `${R.label(g.from)} (${TYPE_NAMES[g.typ]}, ${g.score})`).join(', ')}`);
-    if (e.markers && e.markers.length) why.push(`rule flag: ${e.markers.join(', ')}`);
-    const ctxBox = h('div', { class: 'ctx' });
-    const div = h('div', { class: 'result' },
-      h('div', { class: 'group-head' }, h('span', null, tier(1, true), refLink(v), kind === 'support' && res.isDirect(e) ? h('span', { class: 'small' }, ' · direct') : null), h('span', { class: 'strength' }, e.score ? `strength ${e.score.toFixed(1)}` : '')),
-      h('div', null, tx || h('span', { class: 'nodata' }, 'no BSB text')), h('div', { class: 'why' }, why.join(' · ')),
-      h('div', { class: 'row' },
-        h('button', { class: 'btn small', onclick: async () => {
-          if (ctxBox.childNodes.length) { ctxBox.replaceChildren(); return; }
-          const [ca, cz] = await D.contextRange(v, v, 3);
-          for (const x of await D.passageVerses(ca, cz)) ctxBox.append(h('div', { style: x === v ? 'font-weight:600' : '' }, h('span', { class: 'vn' }, R.parts(x)[2]), await D.bsbText(x)));
-          ctxBox.append(cite(`BSB ${R.rangeLabel(ca, cz)}`, ['bsb']));
-        } }, 'Context'),
-        h('button', { class: 'btn small', onclick: () => { c.removed.push(v); c.pins = c.pins.filter((p) => p.v !== v); rerun(); } }, 'Remove'),
-        h('a', { class: 'btn small', href: `#/web/${R.osisOf(v)}` }, 'Web')),
-      ctxBox, cite(`BSB ${R.label(v)}`, ['bsb']));
-    return div;
+const HOW = { word: 'word', lemma: 'lemma', topic: 'topic', entry: 'topic entry' };
+function evidenceLine(m, res) {
+  const bits = [];
+  for (const [ci, x] of m.cov || []) {
+    const name = res.conceptNames[ci];
+    let d = HOW[x.how] || x.how;
+    if (x.how === 'lemma' && x.detail) d += ` ${x.detail}`;
+    if ((x.how === 'topic' || x.how === 'entry') && x.detail) d += `: ${x.detail}`;
+    if (name === 'all' && x.cov < 1) d += ', not next to the claim’s verb';
+    bits.push(`${name} (${d})`);
+  }
+  const g = (m.graph || []).filter((x) => x.step === 1).sort((a, b) => b.score - a.score).slice(0, 2);
+  for (const x of g) bits.push(`linked from ${R.label(x.from)} (${TYPE_NAMES[x.typ]}, ${x.score})`);
+  const g2 = (m.graph || []).filter((x) => x.step === 2).sort((a, b) => b.score - a.score)[0];
+  if (g2 && !g.length) bits.push(`two steps: ${g2.via ? `${R.label(g2.via)} to ` : ''}${R.label(g2.from)} (${TYPE_NAMES[g2.typ]}, ${g2.score})`);
+  return bits.join(' · ');
+}
+function flagLine(f) {
+  if (!f) return null;
+  if (f.rule === 'pinned') return 'You placed this text here by hand.';
+  const w = f.words ? ` ${f.words}${f.gloss ? ` ("${f.gloss}")` : ''}` : '';
+  if (f.rule === 'quantifier') return `Rule: a negation stands directly before "all":${w}. The claim says "every" or "all".`;
+  if (f.rule === 'negation') return `Rule: a negation stands directly before a word that carries the claim:${w}.`;
+  if (f.rule === 'linked') return `Rule: linked to ${R.label(f.from)} (score ${f.score}), a flagged text, and a negation stands within two words of the claim’s words:${w}.`;
+  return null;
+}
+async function partBlock(p, res, c, rerun, kind) {
+  const hits = new Set((p.members || []).filter((m) => !m.quiet && ((m.cov && m.cov.size) || (m.graph && m.graph.length))).map((m) => m.v));
+  const body = h('div', { class: 'part-text' });
+  for (const v of await D.passageVerses(p.a, p.z)) body.append(h('div', { class: hits.has(v) ? 'hit' : 'quiet' }, h('span', { class: 'vn' }, R.parts(v)[2]), (await D.bsbText(v)) || h('span', { class: 'nodata' }, 'no BSB text')));
+  const why = h('ul', { class: 'why' });
+  for (const m of p.members || []) if (hits.has(m.v)) why.append(h('li', null, h('b', null, `${R.parts(m.v)[2]}: `), evidenceLine(m, res) || 'pinned'));
+  const fl = flagLine(p.flag);
+  const ctxBox = h('div', { class: 'ctx' });
+  const showCtx = async () => {
+    if (ctxBox.childNodes.length) { ctxBox.replaceChildren(); return; }
+    const [ca, cz] = p.ctx;
+    ctxBox.append(h('div', { class: 'small muted' }, `Context: ${R.rangeLabel(ca, cz)}`));
+    for (const x of await D.passageVerses(ca, cz)) ctxBox.append(h('div', { class: x >= p.a && x <= p.z ? 'hit' : '' }, h('span', { class: 'vn' }, R.parts(x)[2]), await D.bsbText(x)));
+    ctxBox.append(cite(`BSB ${R.rangeLabel(ca, cz)}`, ['bsb']));
   };
-  parts.push(h('h2', null, `Supporting texts (${res.supporting.length})`));
-  for (const e of res.supporting) parts.push(await item(e, 'support'));
-  parts.push(h('h2', null, `Tension texts (${res.tension.length})`), h('p', { class: 'small muted' }, 'Rule-flagged: texts that use the claim\'s words or lemmas together with a negation, limitation or condition. Read each in context; the rule only points.'));
-  for (const e of res.tension) parts.push(await item(e, 'tension'));
+  const box = h('div', { class: 'part', 'data-a': p.a, 'data-z': p.z, 'data-ctx': `${p.ctx[0]}-${p.ctx[1]}` },
+    h('div', { class: 'part-head' }, refLink(p.a, p.z), p.applies ? h('span', { class: 'small muted' }, ` applies ${p.applies.slice(0, 3).map((x) => R.label(x)).join(', ')}`) : null),
+    body, why.childNodes.length ? why : null, fl ? h('div', { class: 'rule small' }, fl) : null,
+    h('div', { class: 'row' },
+      h('button', { class: 'btn small', onclick: showCtx }, 'Context'),
+      h('button', { class: 'btn small', onclick: () => { for (const m of p.members || []) if (!m.quiet) c.removed.push(m.v); c.pins = c.pins.filter((x) => !(x.v >= p.a && x.v <= p.z)); rerun(); } }, 'Remove'),
+      h('a', { class: 'btn small', href: `#/web/${R.rangeOsis(p.a, p.z)}` }, 'Web')),
+    ctxBox, cite(`BSB ${R.rangeLabel(p.a, p.z)}`, ['bsb']));
+  // a New Testament text that applies an Old Testament text found here opens with its context
+  if (p.applies) await showCtx();
+  return box;
+}
+async function entryBlock(en, res, c, rerun, kind) {
+  const div = h('div', { class: `result ${kind}` },
+    h('div', { class: 'group-head' }, h('span', null, tier(1, true), ' ', h('b', null, en.parts.length > 1 ? `${R.bookName(R.parts(en.a)[0])} ${R.parts(en.a)[1]}` : R.rangeLabel(en.a, en.z)),
+      en.parts.length > 1 ? h('span', { class: 'small muted' }, ` (${en.parts.length} passages in this chapter)`) : null,
+      en.direct ? h('span', { class: 'small' }, ' · two or more of the claim’s words in one verse') : null, en.pinned ? h('span', { class: 'small' }, ' · pinned') : null),
+    h('span', { class: 'strength' }, en.score ? `strength ${en.score.toFixed(1)}` : '')));
+  for (const p of en.parts) div.append(await partBlock(p, res, c, rerun, kind));
+  return div;
+}
+async function claimReport(res, c, rerun) {
+  const conceptText = res.concepts.map((k) => (k.quant ? '"all" (quantifier: πᾶς, כֹּל)' : `${k.k} (${k.df} verses; forms: ${k.forms.map((f) => f[0]).slice(0, 8).join(', ')})`)).join('; ');
+  const parts = [h('div', { class: 'card' }, h('div', { class: 'weight' }, res.weight),
+    h('details', null, h('summary', { class: 'small' }, 'How this search worked'),
+      h('p', { class: 'small' }, `Words searched: ${conceptText || 'none'}.`),
+      h('p', { class: 'small' }, `Lemmas underneath: ${res.lemmas.filter((l) => !l.quant).map((l) => `${l.lemma} ${l.pk} "${l.gloss}"`).join(', ') || 'none'}.`),
+      h('p', { class: 'small' }, `Topics: ${res.topics.map((t) => `${t.title} (${t.src === 'nave' ? 'Nave' : 'Torrey'})`).join('; ') || 'none'}.`),
+      h('p', { class: 'small muted' }, 'Strength is a count, not a judgment: rarer words count more, verses carrying more of the claim count more, and links in the cross-reference graph add weight. Nothing here says whether the claim is true.')))];
+  for (const w of res.warnings.filter((x) => /^Only Tier 2 to 4/.test(x))) parts.push(h('div', { class: 'warnbox' }, w));
+  parts.push(h('h2', null, `Supporting texts (${res.supporting.length})`), h('p', { class: 'small muted' }, 'Sorted by strength. Passages from one chapter are grouped. Each text can be opened in context.'));
+  for (const en of res.supporting) parts.push(await entryBlock(en, res, c, rerun, 'support'));
+  const low = res.lowTier.filter((p) => p.as !== 'tension');
+  if (low.length) {
+    parts.push(h('h3', null, 'Pinned witnesses (Tier 2 to 4)'));
+    for (const p of low) parts.push(h('div', { class: `result box-t${p.tier}` }, h('div', null, tier(p.tier), ' ', h('b', null, p.label), p.work ? h('span', { class: 'small muted' }, ` (${p.work})`) : null),
+      p.bundled === false ? h('div', { class: 'small' }, nodata('Text not carried in Threads; read it in your own edition.')) : null,
+      h('div', { class: 'small muted' }, 'Shown beside the evidence. It never counts as support from Scripture.')));
+  }
+  if (res.linked.length) {
+    parts.push(h('h3', null, `Reached only through cross-references (${res.linked.length})`), h('p', { class: 'small muted' }, 'These texts do not use the claim’s words. The cross-reference graph links them to the passages above.'));
+    for (const en of res.linked) parts.push(await entryBlock(en, res, c, rerun, 'linked'));
+  }
+  parts.push(h('h2', null, `Tension texts (${res.tension.length})`), h('p', { class: 'small muted' }, 'Rule-flagged texts that may qualify, limit or cut against the claim. Each says which rule flagged it. Read each in context; the rule only points.'));
+  if (!res.tension.length) parts.push(h('p', { class: 'muted' }, 'No text was flagged by the rules. That does not mean none exists; pin any you know of.'));
+  for (const en of res.tension) parts.push(await entryBlock(en, res, c, rerun, 'tension'));
   parts.push(h('h2', null, `Variant dependencies (${res.variants.length})`));
   if (!res.variants.length) parts.push(h('p', { class: 'muted' }, 'None found among these texts.'));
-  for (const x of res.variants) parts.push(h('div', { class: 'result' }, refLink(x.v), ` (${x.group})`, h('ul', { class: 'small' }, x.notes.map((n) => h('li', null, n.text))), cite(`STEPBible TAHOT/TAGNT variant marks; SBLGNT; ETCBC/dss comparison`, ['stepbible', 'sblgnt', 'dss'])));
+  for (const x of res.variants) parts.push(h('div', { class: 'result' }, refLink(x.v), ` (${x.group})`, h('ul', { class: 'small' }, x.notes.map((n) => h('li', null, n.text))), cite('STEPBible TAHOT/TAGNT variant marks; SBLGNT; ETCBC/dss comparison', ['stepbible', 'sblgnt', 'dss'])));
   parts.push(h('h2', null, `Tier warnings (${res.warnings.length})`));
   if (!res.warnings.length) parts.push(h('p', { class: 'muted' }, 'None. Every text above is Tier 1 Scripture.'));
+  for (const w of res.warnings) parts.push(h('div', { class: 'warnbox' }, w));
   return parts;
 }
 
@@ -602,6 +711,7 @@ export async function renderJourney(id) {
       const [a, z] = R.parseOsisRange(s.ref);
       const [ca, cz] = s.context ? R.parseOsisRange(s.context) : [a, z];
       for (const x of await D.passageVerses(ca, cz)) sec.append(await verseBlock(x, { ctx: x < a || x > z }));
+      if (s.note) sec.append(ai(aiData.journey_notes[s.note], aiData._by));
       sec.append(h('div', { class: 'row' }, h('a', { class: 'btn', href: `#/web/${s.ref}` }, 'See the web'), h('a', { class: 'btn', href: `#/read/${s.ref}` }, 'Read')));
     } else if (s.kind === 'heb-lxx') {
       sec.append(await hebLxxTable(s.ref), ai(aiData.journey_notes[s.note], aiData._by));
@@ -610,7 +720,9 @@ export async function renderJourney(id) {
       const [a, z] = R.parseOsisRange(s.ref);
       const det = h('details', null, h('summary', null, `Read ${R.rangeLabel(a, z)}`));
       for (const x of await D.passageVerses(a, z)) det.append(await verseBlock(x));
-      sec.append(det, await quoteTable(s.quote, s.source), ai(aiData.journey_notes[s.note], aiData._by));
+      sec.append(det, await quoteTable(s.quote, s.source));
+      for (const [q2, s2] of s.extra || []) sec.append(await quoteTable(q2, s2));
+      sec.append(ai(aiData.journey_notes[s.note], aiData._by));
       sec.append(h('div', { class: 'row' }, h('a', { class: 'btn', href: `#/web/${s.quote}` }, 'See the web')));
     } else if (s.kind === 'scroll') {
       sec.append(h('p', null, tier(3), 'Jewish background. Never presented as Scripture.'));
@@ -621,15 +733,16 @@ export async function renderJourney(id) {
 }
 async function hebLxxTable(ref) {
   const [a, z] = R.parseOsisRange(ref);
-  const tb = h('table', { class: 'cmp' }, h('tr', null, h('th', null, 'Verse'), h('th', null, 'Hebrew (literal) and BSB'), h('th', null, tier(2, true), 'Septuagint and Brenton')));
+  const tb = h('table', { class: 'cmp' }, h('tr', null, h('th', null, 'Verse'), h('th', null, 'Hebrew, word by word in English, then the BSB'), h('th', null, tier(2, true), 'Septuagint in English (Brenton)')));
   for (const v of await D.passageVerses(a, z)) {
     const [o, lx, hr] = await Promise.all([D.orig(v), D.lxx(v), D.hebRef(v)]);
     const lit = o ? o.w.map((w) => (w[2] || '').replace(/\//g, '').replace(/<[^>]*>/g, '').trim()).filter(Boolean).join(' ') : '';
-    tb.append(h('tr', null, h('td', null, h('b', null, R.keyOf(v)), hr ? h('div', { class: 'note-heb' }, `Heb ${hr.replace('.', ':')}`) : null),
-      h('td', null, h('div', { class: 'heb-text', style: 'font-size:1.1rem' }, o ? o.w.map((w) => w[0]).join(' ') : ''), h('div', { class: 'small' }, lit), h('div', null, await D.bsbText(v))),
-      h('td', null, lx ? [h('div', { class: 'grk-text' }, lx[0]), h('div', null, lx[1])] : nodata())));
+    tb.append(h('tr', null, h('td', null, h('b', null, R.keyOf(v)), hr ? h('div', { class: 'note-heb' }, `Heb ${hr.replace('.', ':')}`) : null, lx && lx[2] ? h('div', { class: 'note-heb' }, `LXX ${lx[2]}`) : null),
+      h('td', null, h('div', { class: 'lit-line' }, lit), h('div', { class: 'small' }, 'BSB: ', await D.bsbText(v)),
+        o ? h('details', null, h('summary', { class: 'small' }, 'Hebrew'), h('div', { class: 'heb-text' }, o.w.map((w) => w[0]).join(' '))) : null),
+      h('td', null, lx ? [h('div', null, lx[1] || nodata()), lx[0] ? h('details', null, h('summary', { class: 'small' }, 'Greek'), h('div', { class: 'grk-text' }, lx[0])) : nodata('No Greek in the Swete transcription here.')] : nodata())));
   }
-  return h('div', null, tb, cite(`Hebrew: STEPBible TAHOT (WLC); English: BSB; Greek: Swete; English: Brenton. ${R.rangeLabel(a, z)}`, ['stepbible', 'bsb', 'lxx']));
+  return h('div', null, tb, cite(`Hebrew: STEPBible TAHOT (WLC), with its English glosses; English: BSB; Septuagint: Swete's Greek with Brenton's English. ${R.rangeLabel(a, z)}`, ['stepbible', 'bsb', 'lxx']));
 }
 // word-by-word comparison of a New Testament quotation with the Septuagint
 async function quoteTable(quote, source) {
@@ -669,10 +782,10 @@ export function diffWords(a, b) {
   return { onlyA, onlyB };
 }
 async function scrollPassage(p, aiData) {
-  const m = /^(\S+)\s+(\d+):(\d+)-(\d+)$/.exec(p);
+  const m = /^(\S+)\s+(\S+):(\d+)-(\d+)$/.exec(p);
   const [, sc, col, l1, l2] = m;
   const t = await D.scrollText(sc);
-  const box = h('div', { class: 'card box-t3' }, h('div', { class: 'row' }, h('b', null, `${sc} ${col}:${l1}-${l2}`), leonLevy(sc)));
+  const box = h('div', { class: 'card box-t3' }, h('div', { class: 'row' }, h('b', null, `${scrollName(sc)}, ${dssLoc([`${col}:${l1}`, `${col}:${l2}`])}`), leonLevy(sc)));
   if (!t) { box.append(nodata()); return box; }
   for (const [fr, ln, words] of t.lines) {
     if (fr !== col || +ln < +l1 || +ln > +l2) continue;

@@ -1,17 +1,206 @@
 // Self-test: each check reads the same data and code the app uses.
 import * as D from './data.js';
 import * as R from './refs.js';
-import { runClaim, variantCheck } from './claim.js';
+import { runClaim, variantCheck, namedWork } from './claim.js';
 import { diffWords } from './views.js';
 import { linksFor, weightOf } from './links.js';
 import { toSermon } from './trail.js';
 import { ai as aiBox } from './ui.js';
 
 const tests = [];
-const test = (name, fn) => tests.push({ name, fn });
+let GROUP = 'Acceptance tests (from the Threads specification)';
+const test = (name, fn) => tests.push({ name, fn, group: GROUP });
 const V = (osis) => R.parseOsis(osis);
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 
+
+// ============================================================== acceptance tests
+const FIX = () => D.getJSON('meta/fixtures.json');
+const SETTINGS_KEY = 'threads.settings.v1';
+async function withSettings(obj, fn) {
+  let prev = null;
+  try { prev = localStorage.getItem(SETTINGS_KEY); localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj)); } catch { /* ignore */ }
+  try { return await fn(); } finally { try { if (prev === null) localStorage.removeItem(SETTINGS_KEY); else localStorage.setItem(SETTINGS_KEY, prev); } catch { /* ignore */ } }
+}
+const squeeze = (t) => (t || '').replace(/\s+/g, ' ').trim();
+let frameN = 0;
+async function openReader(osis, ready) {
+  const f = document.getElementById('app');
+  frameN += 1;
+  const tag = `t=${frameN}`;
+  f.src = `index.html?${tag}#/read/${osis}`;
+  // wait for the new page, not the one still showing from the previous check
+  await waitFor(() => f.contentDocument && f.contentWindow.location.href.includes(tag) && f.contentDocument.readyState === 'complete' && f.contentDocument.querySelector('h1') && ready(f.contentDocument), 25000);
+  return f.contentDocument;
+}
+
+test('Verse counts per book match the source data (BSB, WEB, KJV, Hebrew TAHOT, Greek TAGNT)', async () => {
+  const fx = await FIX();
+  const bad = []; const tot = { bsb: 0, web: 0, kjv: 0, orig: 0 };
+  for (const [osis] of R.BOOKS) {
+    const t = await D.getJSON(`text/${osis}.json`); const o = await D.getJSON(`orig/${osis}.json`);
+    const n = { bsb: 0, web: 0, kjv: 0, orig: 0 };
+    for (const [k, e] of Object.entries(t.v)) {
+      if (k.endsWith(':0')) continue;
+      if (e.bsb && e.bsb.length) n.bsb += 1;
+      if (e.web) n.web += 1;
+      if (e.kjv) n.kjv += 1;
+    }
+    for (const e of Object.values(o.v)) if (e.w && e.w.length) n.orig += 1;
+    for (const k of Object.keys(n)) { tot[k] += n[k]; if (n[k] !== fx.counts[osis][k]) bad.push(`${osis} ${k}: app ${n[k]}, source ${fx.counts[osis][k]}`); }
+  }
+  assert(!bad.length, bad.slice(0, 8).join('; '));
+  return `66 books match in all five sources. Totals: BSB ${tot.bsb}, WEB ${tot.web}, KJV ${tot.kjv}, Hebrew and Greek ${tot.orig}`;
+});
+test('English Joel 2:28 maps to Hebrew Joel 3:1', async () => {
+  const hr = await D.hebRef(V('Joel.2.28'));
+  assert(hr === '3.1', `Hebrew reference ${hr}`);
+  const doc = await openReader('Joel.2.28', (d) => d.querySelectorAll('.verse').length >= 1);
+  const note = doc.querySelector('.note-heb');
+  assert(note && /3:1/.test(note.textContent), `reader note: ${note ? note.textContent : 'missing'}`);
+  return `${note.textContent.trim()}; TAHOT words for English 2:28 open "${(await D.orig(V('Joel.2.28'))).w.slice(0, 3).map((w) => w[0]).join(' ')}"`;
+});
+test('Psalm numbering maps correctly between the Hebrew and the Septuagint (every verse in STEPBible TVTMS)', async () => {
+  const fx = await FIX();
+  const lxx = (await D.getJSON('lxx/Ps.json')).v;
+  const bad = []; const noGreek = [];
+  for (const [e, hh, g] of fx.psalms) {
+    const [c, v] = e.split(':').map(Number);
+    const ah = ((await D.hebRef(R.vid(19, c, v))) || e.replace(':', '.')).replace('.', ':');
+    if (ah !== hh) bad.push(`English ${e}: Hebrew ${ah}, TVTMS ${hh}`);
+    const rec = lxx[e];
+    if (!rec || !rec[0]) { noGreek.push(e); continue; }
+    const ag = rec[2] || e;
+    if (ag !== g) bad.push(`English ${e}: Septuagint ${ag}, TVTMS ${g}`);
+  }
+  assert(!bad.length, bad.slice(0, 8).join('; '));
+  const ex = (e) => { const r = fx.psalms.find((x) => x[0] === e); return r ? `English ${r[0]} = Hebrew ${r[1]} = LXX ${r[2]}` : ''; };
+  return `${fx.psalms.length} verses agree. ${ex('51:1')}; ${ex('10:1')}; ${ex('116:10')}; ${ex('147:12')}. No Greek in the Swete transcription at ${noGreek.join(', ')} (shown as no data).`;
+});
+test('20 random verses render identically to the upstream files (BSB, WEB, KJV, Hebrew or Greek)', async () => {
+  const fx = await FIX();
+  const pool = [...fx.sample];
+  const pick = [];
+  while (pick.length < 20 && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  const bad = []; let fields = 0;
+  await withSettings({ web: true, kjv: true, orig: true }, async () => {
+    for (const s of pick) {
+      const v = V(s.v);
+      const doc = await openReader(s.v, (d) => d.getElementById(`v${v}`));
+      const box = doc.getElementById(`v${v}`);
+      const textOf = (el) => squeeze([...el.childNodes].filter((n) => !(n.classList && (n.classList.contains('vn') || n.tagName === 'B'))).map((n) => n.textContent).join(''));
+      let bsb = textOf(box.querySelector('.bsb'));
+      const title = doc.getElementById(`v${v - R.parts(v)[2]}`);
+      if (title && R.parts(v)[2] === 1) bsb = squeeze(`${textOf(title.querySelector('.bsb'))} ${bsb}`);
+      const alts = [...box.querySelectorAll('.alt')];
+      const web = alts.find((a) => /^WEB/.test(a.textContent)); const kjv = alts.find((a) => /^KJV/.test(a.textContent));
+      const checks = [['BSB', bsb, s.bsb]];
+      if (s.web) checks.push(['WEB', web ? textOf(web) : '', s.web]);
+      if (s.kjv) checks.push(['KJV', kjv ? textOf(kjv) : '', s.kjv]);
+      if (s.heb) checks.push(['Hebrew', squeeze([...box.querySelectorAll('.lit .o')].map((x) => x.textContent).join(' ')), s.heb]);
+      if (s.grk) checks.push(['Greek', squeeze((box.querySelector('.grk-text') || {}).textContent), s.grk]);
+      for (const [name, got, want] of checks) { fields += 1; if (got !== squeeze(want)) bad.push(`${s.v} ${name}: shows "${got.slice(0, 60)}" but source has "${squeeze(want).slice(0, 60)}"`); }
+    }
+  });
+  assert(!bad.length, bad.slice(0, 4).join(' | '));
+  return `${pick.length} verses, ${fields} texts identical: ${pick.map((x) => x.v).join(', ')}`;
+});
+test('The five Dead Sea Scrolls variants appear with correct citations', async () => {
+  const fx = await FIX();
+  const out = [];
+  const ai = await D.meta.ai();
+  const fmt = (labels) => {
+    const by = new Map();
+    for (const l of labels) { const i = l.lastIndexOf(':'); const f = l.slice(0, i); if (!by.has(f)) by.set(f, []); by.get(f).push(+l.slice(i + 1)); }
+    return [...by].map(([f, ns]) => [f.startsWith('f') ? `frag. ${f.slice(1)}` : `col. ${f}`, Math.min(...ns), Math.max(...ns)]);
+  };
+  const where = { '4Q37': ['Deut.32.8', 'Deut.32.8'], '4Q51': ['1Sam.10.27', '1Sam.10.27'], '11Q5': ['Ps.145.13', 'Ps.145.13'], '1Qisaa': ['Isa.53.11', 'Isa.53.11'], '1Q8': ['Isa.53.11', 'Isa.53.11'], '4Q71': ['Jer.10.5', 'Jer.10.5'] };
+  for (const d of fx.dss) {
+    const [osis, noteKey] = where[d.scroll];
+    const key = osis.split('.').slice(1).join(':');
+    const doc = await openReader(osis, (x) => [...x.querySelectorAll('.vtools .chip')].some((b) => /Scrolls/.test(b.textContent)));
+    [...doc.querySelectorAll('.vtools .chip')].find((b) => /Scrolls/.test(b.textContent)).click();
+    await waitFor(() => doc.querySelector(`.dss-card[data-scroll="${d.scroll}"]`));
+    const card = doc.querySelector(`.dss-card[data-scroll="${d.scroll}"]`);
+    const citeText = card.querySelector('.dss-cite').textContent;
+    assert(citeText.includes(d.siglum) && citeText.includes(d.scroll), `${d.label}: citation "${citeText}" lacks ${d.scroll} (${d.siglum})`);
+    for (const [lab, a, z] of fmt(d.verses[key] || [])) {
+      const want = a === z ? `${lab}, line ${a}` : `${lab}, lines ${a}-${z}`;
+      assert(citeText.includes(want), `${d.label}: citation "${citeText}" lacks "${want}" (Text-Fabric)`);
+    }
+    const note = ai.dss_notes[osis === 'Jer.10.5' ? 'Jer.10.5' : osis];
+    assert(note, `${d.label}: no note`);
+    assert(doc.querySelector('.sheet .ai, #sheet-body .ai'), `${d.label}: note not shown as AI text`);
+    out.push(citeText);
+  }
+  return out.join(' | ');
+});
+test('TAGNT edition flags display for Acts 8:37 and Mark 16:9-20', async () => {
+  const fx = await FIX();
+  const names = { NA28: 'NA28', NA27: 'NA27', Tyn: 'Tyndale House GNT', SBL: 'SBLGNT', WH: 'Westcott-Hort', Treg: 'Tregelles', TR: 'Textus Receptus', Byz: 'Byzantine' };
+  const seen = [];
+  for (const [osis, e] of Object.entries(fx.editions)) {
+    const v = V(osis);
+    const doc = await openReader(osis, (d) => d.getElementById(`v${v}`));
+    const flag = doc.getElementById(`v${v}`).querySelector('.edflag');
+    assert(flag, `${osis}: no edition flag shown`);
+    const shown = flag.dataset.editions.split('|').filter(Boolean);
+    const want = e.any.map((x) => names[x]);
+    assert(shown.join(',') === want.join(','), `${osis}: flag lists ${shown.join(', ')}; TAGNT lists ${want.join(', ')}`);
+    if (osis === 'Acts.8.37') assert(/only in the Textus Receptus/.test(flag.textContent), 'Acts 8:37: flag does not say Textus Receptus only');
+    else assert(/[Dd]ouble brackets/.test(flag.textContent), `${osis}: flag does not mention the double brackets`);
+    seen.push(osis.replace('.', ' ').replace('.', ':'));
+  }
+  return `${seen.length} verses flagged: ${seen.join(', ')}`;
+});
+const where = (res, v) => {
+  for (const [name, list] of [['support', res.supporting], ['linked', res.linked], ['tension', res.tension]]) {
+    for (const en of list) for (const p of en.parts) if (v >= p.a && v <= p.z) return { group: name === 'linked' ? 'support' : name, p, en };
+  }
+  return null;
+};
+const verdictWords = /\b(true|false|proven|disproven|correct|incorrect|wrong|right)\b/i;
+test('Claim test: "Every believer can prophesy" surfaces Num 11:29, Joel 2:28, Acts 2:17-18 and 1 Cor 14:1, 5, 24, 31 as support, and 1 Cor 12:29 as tension', async () => {
+  const res = await runClaim('Every believer can prophesy');
+  const miss = [];
+  for (const r of ['Num.11.29', 'Joel.2.28', 'Acts.2.17', 'Acts.2.18', '1Cor.14.1', '1Cor.14.5', '1Cor.14.24', '1Cor.14.31']) { const w = where(res, V(r)); if (!w || w.group !== 'support') miss.push(`${r} ${w ? `in ${w.group}` : 'not found'}`); }
+  const t = where(res, V('1Cor.12.29'));
+  if (!t || t.group !== 'tension') miss.push(`1Cor.12.29 ${t ? `in ${t.group}` : 'not found'}`);
+  assert(!miss.length, miss.join('; '));
+  assert(!verdictWords.test(res.weight), res.weight);
+  return `${res.weight} 1 Cor 12:29 flagged: ${t.p.flag.words} ("${t.p.flag.gloss}").`;
+});
+test('Claim test: "Healing is in the atonement" surfaces Isa 53:4-5 and Matt 8:16-17 as support, and 1 Pet 2:24 with its context 2:21-25', async () => {
+  const res = await runClaim('Healing is in the atonement');
+  const miss = [];
+  for (const r of ['Isa.53.4', 'Isa.53.5', 'Matt.8.16', 'Matt.8.17', '1Pet.2.24']) { const w = where(res, V(r)); if (!w || w.group !== 'support') miss.push(`${r} ${w ? `in ${w.group}` : 'not found'}`); }
+  assert(!miss.length, miss.join('; '));
+  const pe = where(res, V('1Pet.2.24')).p;
+  assert(pe.ctx[0] <= V('1Pet.2.21') && pe.ctx[1] >= V('1Pet.2.25'), `context ${R.rangeLabel(pe.ctx[0], pe.ctx[1])}`);
+  assert(pe.applies && pe.applies.some((x) => R.parts(x)[0] === 23), '1 Pet 2:24 is not shown as applying Isaiah, so its context does not open');
+  return `${res.weight} 1 Peter shown as ${R.rangeLabel(pe.a, pe.z)} in context ${R.rangeLabel(pe.ctx[0], pe.ctx[1])}, applying ${pe.applies.filter((x) => R.parts(x)[0] === 23).map(R.label).join(', ')}.`;
+});
+test('Claim test: "Children bear their parents\' guilt" surfaces Exod 20:5 and 34:7, Ezek 18:20, Deut 24:16 and Gal 3:13', async () => {
+  const res = await runClaim("Children bear their parents' guilt");
+  const got = []; const miss = [];
+  for (const r of ['Exod.20.5', 'Exod.34.7', 'Ezek.18.20', 'Deut.24.16', 'Gal.3.13']) { const w = where(res, V(r)); if (w) got.push(`${r} (${w.group})`); else miss.push(r); }
+  assert(!miss.length, `Found ${got.join(', ')}. Not surfaced: ${miss.join(', ')}. ${miss.includes('Gal.3.13') ? 'The data ties Gal 3:13 to this claim only through Torrey’s entry "Bore the curse of" (one of the claim’s four words) and a two-step link (Ezek 18:20 to 1 Pet 2:24 to Gal 3:13); the claim test does not reach it without wording that names the curse. Pin it by hand.' : ''}`);
+  return `${got.join(', ')}. ${res.weight}`;
+});
+test('Tier rule: a claim supported only by 1 Enoch triggers the tier warning', async () => {
+  const nw = namedWork('1 Enoch 8:1');
+  assert(nw && nw.tier === 3, `1 Enoch read as ${JSON.stringify(nw)}`);
+  const res = await runClaim('Azazel and Semjaza are Grigori', { pins: [{ tier: nw.tier, label: '1 Enoch 8:1', as: 'support', work: nw.name, bundled: nw.bundled }] });
+  assert(!res.supporting.length && !res.linked.length, `unexpected Scripture support: ${res.supporting.map((e) => R.rangeLabel(e.a, e.z)).join(', ')}`);
+  const w = res.warnings.find((x) => /Only Tier 2 to 4 texts support this claim/.test(x));
+  assert(w, res.warnings.join(' | '));
+  const ctrl = await runClaim('Azazel and Semjaza are Grigori', { pins: [{ tier: 3, label: '1 Enoch 8:1', as: 'support' }, { tier: 1, v: V('Gen.6.4'), label: 'Genesis 6:4', as: 'support' }] });
+  assert(!ctrl.warnings.some((x) => /Only Tier 2 to 4/.test(x)), 'warning shown even with Scripture pinned');
+  return w;
+});
+
+// ============================================================== further checks written for Threads
+GROUP = 'Further checks';
 test('BSB text loads: Joel 2:28 says "I will pour out My Spirit"', async () => {
   const t = await D.bsbText(V('Joel.2.28'));
   assert(/pour out My Spirit/.test(t), t);
@@ -50,17 +239,18 @@ test('Acts 2:17 links to Joel 2:28-32 as a direct quotation, scored from shared 
   assert(l.quote && l.quote[0] >= 10 && /πνευματοσ/.test(l.quote[1]), JSON.stringify(l.quote));
   return `score ${l.score} (Q ${l.Q}, L ${l.L}, V ${l.V}, T ${l.T}); run of ${l.quote[0]} words`;
 });
-test('Link scores add up (Q+L+V+T) and every link type follows the published rules (900 links)', async () => {
+test('Link scores add up (Q+L+V+T+N) and every link type follows the published rules (900 links)', async () => {
   const df = await D.meta.df();
   let n = 0;
-  for (const bk of ['Gen', 'Ps', 'Isa', 'Joel', 'Matt', 'Acts', 'Rom', 'Heb', 'Rev']) {
-    const d = await D.getJSON(`xref/${bk}.json`);
+  for (const [bk, c] of [['Gen', 1], ['Ps', 22], ['Isa', 53], ['Joel', 2], ['Matt', 8], ['Acts', 2], ['Rom', 8], ['Heb', 1], ['Rev', 21]]) {
+    const d = await D.getJSON(`xref/${bk}/${c}.json`);
     const keys = Object.keys(d.v);
     for (let i = 0; i < 100; i++) {
       const k = keys[(i * 37) % keys.length];
       const r = d.v[k][i % d.v[k].length];
-      const [b0, , typ, score, Q, L, Vv, T, shared, , quote, typo] = r;
-      assert(score === Q + L + Vv + T, `${bk} ${k}: ${score} != ${Q}+${L}+${Vv}+${T}`);
+      const [b0, , typ, score, Q, L, Vv, T, shared, , quote, typo, Nn] = r;
+      const N = Nn || 0;
+      assert(score === Q + L + Vv + T + N, `${bk} ${k}: ${score} != ${Q}+${L}+${Vv}+${T}+${N}`);
       const sb = R.bookIndex(bk);
       const cross = (sb >= R.NT_START) !== (R.parts(b0)[0] >= R.NT_START);
       // stored weights are rounded to 0.1, so a weight within 0.05 of a threshold may fall either side
@@ -70,13 +260,14 @@ test('Link scores add up (Q+L+V+T) and every link type follows the published rul
         const truncated = (shared || []).length === 6;
         const aByLemma = keysW.length >= 3 && (sumKeys >= 15 - sumSlack || truncated) && (Vv >= 10 || T);
         if (quote && quote[0] >= 4 && cross) return 'q';
-        if ((quote && quote[0] === 3 && cross) || aByLemma) return 'a';
+        if ((quote && quote[0] === 3 && cross) || (N && cross) || aByLemma) return 'a';
         if (typo) return 't';
         if (keysW.length) return 'l';
         return 'e';
       };
-      const strict = ruleType(3.55, 0); const lenient = ruleType(3.45, 0.6);
-      if (typ !== strict && typ !== lenient) throw new Error(`${bk} ${k} -> ${R.label(b0)}: type ${typ}, rules give ${strict}`);
+      // each stored weight is rounded to 0.1, so a sum within 0.15 of a threshold may fall either side
+      const strict = ruleType(3.55, 0); const lenient = ruleType(3.45, 0.6); const tight = ruleType(3.65, -0.16);
+      if (typ !== strict && typ !== lenient && typ !== tight) throw new Error(`${bk} ${k} -> ${R.label(b0)}: type ${typ}, rules give ${strict}`);
       for (const [pk, w] of shared || []) {
         const ww = weightOf(pk, df);
         assert(Math.abs(ww - w) < 0.11, `${pk}: stored weight ${w}, recomputed ${ww.toFixed(2)}`);
@@ -102,8 +293,7 @@ test('The claim test never hands down a verdict', async () => {
 });
 test('Claim test finds Joel 2:28 or Acts 2:17 for "God pours out his Spirit on all flesh"', async () => {
   const res = await runClaim('God pours out his Spirit on all flesh');
-  const ids = res.supporting.map((e) => e.v);
-  assert(ids.includes(V('Joel.2.28')) || ids.includes(V('Acts.2.17')), ids.map(R.label).join(', '));
+  assert(where(res, V('Joel.2.28')) || where(res, V('Acts.2.17')), res.supporting.map((e) => R.rangeLabel(e.a, e.z)).join(', '));
   return res.weight;
 });
 test('Variant dependency: "signs will accompany those who believe" flags Mark 16:17', async () => {
@@ -115,7 +305,7 @@ test('Variant dependency: "signs will accompany those who believe" flags Mark 16
 test('Variant dependency: John 5:4 is not in the Nestle-Aland text', async () => {
   const ai = await D.meta.ai();
   const notes = await variantCheck(V('John.5.4'), new Set(), ai);
-  assert(notes.some((n) => /not in the Nestle-Aland/.test(n.text)), JSON.stringify(notes));
+  assert(notes.some((n) => /not count this verse as Nestle-Aland text|not in the Nestle-Aland/.test(n.text)), JSON.stringify(notes));
   return notes[0].text;
 });
 test('Scrolls: 4QDeut-j (4Q37) reads אלוהים at Deut 32:8 where the Masoretic Text has ישראל', async () => {
@@ -174,7 +364,7 @@ test('AI text renders inside a labelled, separately styled box', async () => {
 });
 test('No em dashes in app code, AI text, journeys, sources or the README', async () => {
   const files = ['index.html', 'selftest.html', 'sw.js', 'manifest.webmanifest', 'README.md', 'app/main.js', 'app/views.js', 'app/data.js', 'app/refs.js', 'app/ui.js',
-    'app/trail.js', 'app/links.js', 'app/graph.js', 'app/claim.js', 'app/selftest.js', 'app/styles.css', 'data/ai/ai.json', 'data/journeys/journeys.json', 'data/meta/sources.json'];
+    'app/trail.js', 'app/links.js', 'app/graph.js', 'app/claim.js', 'app/editions.js', 'app/selftest.js', 'app/styles.css', 'data/ai/ai.json', 'data/journeys/journeys.json', 'data/meta/sources.json', 'data/idx/typology.json'];
   const bad = [];
   for (const f of files) {
     const r = await fetch(f);
@@ -244,9 +434,11 @@ test('Sources: every dataset is pinned to a commit and carries a license and att
 });
 test('Typology links come from a typology entry of Nave or Torrey', async () => {
   const ty = await D.meta.typology();
-  const d = await D.getJSON('xref/Heb.json');
   let seen = 0;
-  for (const recs of Object.values(d.v)) for (const r of recs) if (r[2] === 't') { assert(ty[r[11]] && /typ/i.test(ty[r[11]][1]), JSON.stringify(r)); seen += 1; }
+  for (let c = 1; c <= 13; c++) {
+    const d = await D.getJSON(`xref/Heb/${c}.json`);
+    for (const recs of Object.values(d.v)) for (const r of recs) if (r[2] === 't') { assert(ty[r[11]] && /typ/i.test(ty[r[11]][1]), JSON.stringify(r)); seen += 1; }
+  }
   assert(seen > 0, 'no typology links in Hebrews');
   return `${seen} typology links in Hebrews, all traced to an entry`;
 });
@@ -276,7 +468,7 @@ test('Offline: a service worker controls the app and the app shell is stored', a
   if (!('serviceWorker' in navigator)) throw new Error('no service worker support');
   const reg = await navigator.serviceWorker.getRegistration();
   assert(reg, 'not registered');
-  const c = await caches.open('threads-shell-v1');
+  const c = await caches.open((await caches.keys()).find((k) => k.startsWith('threads-shell-')) || 'threads-shell-v2');
   assert(await c.match('index.html'), 'index.html not stored');
   return 'shell cached';
 });
@@ -298,24 +490,28 @@ async function main() {
   const rows = document.getElementById('rows');
   const results = [];
   let i = 0;
-  for (const t of tests) {
+  let lastGroup = '';
+  const only = new URLSearchParams(location.search).get('only');
+  for (const t of tests.filter((x) => !only || x.name.toLowerCase().includes(only.toLowerCase()))) {
     i += 1;
+    if (t.group !== lastGroup) { lastGroup = t.group; const g = document.createElement('tr'); g.innerHTML = `<th colspan="4" class="group">${t.group}</th>`; rows.append(g); }
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${i}</td><td>${t.name}</td><td>running</td><td></td>`;
     rows.append(tr);
     try {
       const detail = await t.fn();
-      results.push({ name: t.name, pass: true, detail });
+      results.push({ name: t.name, pass: true, detail, group: t.group });
       tr.children[2].innerHTML = '<span class="pass">PASS</span>';
       tr.children[3].textContent = detail || '';
     } catch (e) {
-      results.push({ name: t.name, pass: false, detail: String(e.message || e) });
+      results.push({ name: t.name, pass: false, detail: String(e.message || e), group: t.group });
       tr.children[2].innerHTML = '<span class="fail">FAIL</span>';
       tr.children[3].textContent = String(e.message || e);
     }
   }
   const passed = results.filter((r) => r.pass).length;
-  document.getElementById('summary').textContent = `${passed} of ${results.length} checks passed`;
+  const acc = results.filter((r) => r.group.startsWith('Acceptance'));
+  document.getElementById('summary').textContent = `Acceptance tests: ${acc.filter((r) => r.pass).length} of ${acc.length} passed. All checks: ${passed} of ${results.length} passed.`;
   window.__selftest = { done: true, passed, failed: results.length - passed, results };
 }
 main();

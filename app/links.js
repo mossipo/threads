@@ -13,9 +13,12 @@ export function weightOf(plain, df) {
   return Math.log((isH ? df.nh : df.ng) / d);
 }
 
-function fromRecord(v, r) {
-  const [b0, b1, typ, score, Q, L, V, T, shared, votes, quote, typo] = r;
-  return { from: v, b0, b1, typ, score, Q, L, V, T, shared: shared || [], votes, quote, typo: typo || null, via: [v], origin: 'graph' };
+// record: start, end, type, score, Q, L, V, T, shared lemmas, [votes from this verse, votes from the other],
+// quotation run, typology entry, N (Nave's quotation list); trailing empty fields may be left out
+export function fromRecord(v, r) {
+  const [b0, b1, typ, score, Q, L, V, T, shared, votes, quote, typo, N] = r;
+  const pair = Array.isArray(votes) ? votes : (votes === null || votes === undefined ? null : [votes, null]);
+  return { from: v, b0, b1, typ, score, Q, L, V, T, N: N || 0, shared: shared || [], votes: pair, quote: quote || null, typo: typo || null, via: [v], origin: 'graph' };
 }
 
 export async function linksFor(a, z, opts = {}) {
@@ -83,17 +86,26 @@ export async function explain(link) {
   rows.push(['Shared lemmas (L)', link.L, lem.length
     ? `2.5 points per unit of rarity weight, maximum 40. Weight = ln(verses in corpus / verses using the lemma). ${lem.join('; ')}`
     : 'No shared lemma rare enough to carry weight (lemmas in more than 1,500 verses are ignored).']);
-  rows.push(['OpenBible votes (V)', link.V, link.votes === null || link.votes === undefined
-    ? 'Not in the OpenBible.info data.'
-    : `${link.votes} votes at OpenBible.info. Points = round(10 x log10(1 + votes)), maximum 30; zero or negative votes give 0.`]);
+  const vp = link.votes;
+  let vtext = 'Not in the OpenBible.info data.';
+  if (vp) {
+    const here = rangeLabel(link.from, link.from); const there = rangeLabel(link.b0, link.b1);
+    const parts2 = [];
+    if (vp[0] !== null && vp[0] !== undefined) parts2.push(`${vp[0]} votes for ${here} to ${there}`);
+    if (vp[1] !== null && vp[1] !== undefined) parts2.push(`${vp[1]} votes for ${there} to ${here}`);
+    const used = Math.max(...vp.filter((x) => x !== null && x !== undefined));
+    vtext = `OpenBible.info: ${parts2.join('; ')}.${parts2.length > 1 ? ' The score uses the larger count.' : ''} Points = round(10 x log10(1 + ${used})), maximum 30; zero or negative votes give 0.`;
+  }
+  rows.push(['OpenBible votes (V)', link.V, vtext]);
   rows.push(['Treasury of Scripture Knowledge (T)', link.T, link.T ? 'Listed in the TSK (either direction): 15 points.' : 'Not listed in the TSK.']);
+  rows.push(["Nave's quotation list (N)", link.N || 0, link.N ? "Nave's Topical Bible, QUOTATIONS AND ALLUSIONS, pairs these passages: 20 points. A pair on this list is typed at least as a clear allusion." : "Not paired in Nave's QUOTATIONS AND ALLUSIONS."]);
   if (link.origin === 'lemma') rows.push(['Source of this link', '', 'Found from the lemma index: the two verses share a lemma used in 12 or fewer verses. It is not in OpenBible or the TSK.']);
   return rows;
 }
 
 export function summary(link) {
   const t = { q: 'direct quotation', a: 'clear allusion', l: 'shared key lemma', t: 'typology', e: 'thematic echo' }[link.typ];
-  return `${rangeLabel(link.from, link.from)} to ${rangeLabel(link.b0, link.b1)}: ${t}, score ${link.score} (Q ${link.Q}, L ${link.L}, V ${link.V}, T ${link.T}).`;
+  return `${rangeLabel(link.from, link.from)} to ${rangeLabel(link.b0, link.b1)}: ${t}, score ${link.score} (Q ${link.Q}, L ${link.L}, V ${link.V}, T ${link.T}${link.N ? `, N ${link.N}` : ''}).`;
 }
 
 export function reasonKey(a, b) { return [`${osisOf(a)}|${osisOf(b)}`, `${osisOf(b)}|${osisOf(a)}`]; }
