@@ -21,10 +21,11 @@
         "4QSam-a (4Q51), fragment 10a, lines 6 to 9, has a passage the Masoretic Text lacks, placed between 10:27 and 11:1. The lines are shown word by word below from Abegg's transcription.",
         "It tells of Nahash king of the Ammonites oppressing the Gadites and the Reubenites by force and gouging out every right eye, of Israelites beyond the Jordan, and of 'seven thousand men'. Line 9 then reads 'and it happened about a month later' (ויהי כמו חדש) before Nahash goes up against Jabesh.",
         "Several words in this stretch are the editor's reconstruction (shown faded). Read the order of the last line with care: in this transcription the words about reaching Jabesh-gilead follow 'encamped against Jabesh'.",
-        "Josephus tells the same story (Antiquities 6.68 to 71), so a Hebrew text with this paragraph was known in the first century.",
+        "Josephus tells the same story (Antiquities 6.68 to 71 in the standard numbering; 6.5.1 in Whiston's), so a text with this paragraph was known in the first century.",
         "The BSB, KJV and WEB do not include it. Some modern translations (for example the NRSV) do."
       ],
-      "editions": "Published in Discoveries in the Judaean Desert XVII (2005)."
+      "editions": "Published in Discoveries in the Judaean Desert XVII (2005).",
+      "links": [["Josephus, Antiquities 6.5.1 (Whiston), Tier 3", "#/josephus/6.5.1"]]
     },
     "Ps.145.13": {
       "title": "Psalm 145:13: the missing nun line",

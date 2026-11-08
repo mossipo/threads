@@ -38,13 +38,14 @@ export const vid = (b, c, v) => b * 1e6 + c * 1e3 + v;
 export const parts = (v) => [Math.floor(v / 1e6), Math.floor(v / 1e3) % 1000, v % 1000];
 export const osisOf = (v) => { const [b, c, vv] = parts(v); return `${bookOsis(b)}.${c}.${vv}`; };
 export const keyOf = (v) => { const [, c, vv] = parts(v); return `${c}:${vv}`; };
-export function label(v) { const [b, c, vv] = parts(v); return `${bookName(b)} ${c}:${vv}`; }
+const refName = (b) => (b === 19 ? 'Psalm' : bookName(b));
+export function label(v) { const [b, c, vv] = parts(v); return `${refName(b)} ${c}:${vv}`; }
 export function rangeLabel(a, z) {
   if (!z || a === z) return label(a);
   const [b1, c1, v1] = parts(a); const [b2, c2, v2] = parts(z);
   if (b1 !== b2) return `${label(a)} to ${label(z)}`;
-  if (c1 !== c2) return `${bookName(b1)} ${c1}:${v1}-${c2}:${v2}`;
-  return `${bookName(b1)} ${c1}:${v1}-${v2}`;
+  if (c1 !== c2) return `${refName(b1)} ${c1}:${v1}-${c2}:${v2}`;
+  return `${refName(b1)} ${c1}:${v1}-${v2}`;
 }
 export function parseOsis(s) {
   const m = /^([1-3]?[A-Za-z]+)\.(\d+)\.(\d+)$/.exec(s.trim());

@@ -19,7 +19,7 @@ Built for Barry Mossip, Roseisle Pentecostal Assembly, for preaching, teaching a
 |---|---|---|
 | 1 Scripture | Hebrew and Aramaic Old Testament, Greek New Testament, with English | Authority |
 | 2 Textual witnesses | Dead Sea Scrolls biblical manuscripts, Septuagint | What did the text say? |
-| 3 Jewish background | Dead Sea Scrolls sectarian texts | The world of the New Testament. Never presented as Scripture |
+| 3 Jewish background | Dead Sea Scrolls sectarian texts, Josephus' Antiquities | The world of the New Testament. Never presented as Scripture |
 | 4 Early church | Ante-Nicene Fathers | Reception |
 
 The rule is enforced in code: Tiers 2 to 4 can illuminate, confirm or complicate a reading, but never carry a claim alone. If they do, the claim test says so in plain words.
@@ -49,12 +49,13 @@ Every dataset is pinned to a commit in `build/sources.json`, which also records 
 | Treasury of Scripture Knowledge (CrossWire) | Public domain |
 | Nave's and Torrey's topical indexes | Public domain; structured data MIT |
 | Ante-Nicene Fathers (CCEL ThML) | Public domain |
+| Josephus, Antiquities (Whiston), Project Gutenberg #2848 | Public domain |
 
 **Non-commercial.** Because the Dead Sea Scrolls layer is CC BY-NC 4.0, Threads must stay non-commercial while that layer is included.
 
 **Left out on purpose.** MACULA's semantic domains come from the United Bible Societies ("used with permission" for Clear Bible), with no open license for others. Word Threads shows "no data" for semantic domain until that is resolved.
 
-**Not in this build.** The Samaritan Pentateuch, Etheridge's Targums, Charles's 1 Enoch and Jubilees, Yonge's Philo and Lightfoot's Apostolic Fathers were not reachable from the build environment (see `not_available` in `build/sources.json`). Whiston's Josephus is reachable but not yet integrated.
+**Not in this build.** The Samaritan Pentateuch, Etheridge's Targums, Charles's 1 Enoch and Jubilees, Yonge's Philo and Lightfoot's Apostolic Fathers were not reachable from the build environment (see `not_available` in `build/sources.json`).
 
 ## Running it
 
@@ -80,6 +81,8 @@ python3 -I build/build_lex.py              # lexicons and grammar codes
 python3 -I build/build_dss.py              # scroll readings, comparison and lexeme index
 python3 -I build/build_xref.py             # cross references, quotations and scores
 python3 -I build/build_witnesses.py        # Septuagint, topical indexes, Fathers
+python3 -I build/build_josephus.py         # Josephus, Antiquities
+python3 -I build/build_markers.py          # negation and condition markers for the claim test
 python3 -I build/build_meta.py             # sources, AI text, journeys, checks, file list
 ```
 

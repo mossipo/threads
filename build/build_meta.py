@@ -63,7 +63,7 @@ def main():
 
     packs = {"core": ["text/", "orig/", "lex/", "idx/", "meta/", "ai/", "journeys/"],
              "links": ["xref/", "topics/"],
-             "witnesses": ["lxx/", "dss/", "anf/"]}
+             "witnesses": ["lxx/", "dss/", "anf/", "josephus/"]}
     files = {k: [] for k in packs}
     total = 0
     for root, _, names in os.walk(DATA):

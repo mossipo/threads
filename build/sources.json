@@ -296,13 +296,26 @@
       "attribution": "Roberts, Donaldson and Coxe (eds.), The Ante-Nicene Fathers, from the Christian Classics Ethereal Library ThML edition.",
       "changes": "Scripture references marked in the CCEL edition are indexed by verse.",
       "used_for": "Early church reception (Tier 4)"
+    },
+    {
+      "id": "josephus_ant",
+      "name": "Josephus, Antiquities of the Jews (Whiston), Project Gutenberg #2848",
+      "tier": 3,
+      "repo": "GITenberg/Antiquities-of-the-Jews_2848",
+      "commit": "0188768831eb640ac785116b0649b380ee12ac5d",
+      "paths": [
+        "2848-8.txt",
+        "LICENSE",
+        "README.rst"
+      ],
+      "license": "Public domain (Whiston 1737); Project Gutenberg text",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "attribution": "Flavius Josephus, Antiquities of the Jews, translated by William Whiston. Text from Project Gutenberg (ebook #2848) via GITenberg.",
+      "changes": "Project Gutenberg header, footer and license text removed; Whiston's footnotes left out; em dashes shown as spaced hyphens. Book, chapter and section numbers are Whiston's.",
+      "used_for": "Jewish background (Tier 3): readable by book, chapter and section, linked from the scroll notes"
     }
   ],
   "not_available": [
-    {
-      "name": "Whiston's Josephus",
-      "reason": "Antiquities is reachable through the GITenberg mirror of Project Gutenberg, but it is not integrated in this build: no open dataset links Josephus to verses, and the text alone did not make the first build. It is next on the list."
-    },
     {
       "name": "Samaritan Pentateuch",
       "reason": "Listed as a Tier 2 witness but no dataset was named, and no openly licensed digital text was found."

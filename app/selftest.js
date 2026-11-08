@@ -207,6 +207,14 @@ test('Early church: Justin, Dialogue with Trypho, quotes Joel 2:28', async () =>
   assert(found, 'not found');
   return found;
 });
+test('Tier 3: Josephus, Antiquities 6.5.1 (Whiston) tells of Nahash and is reachable from the 4QSam-a note', async () => {
+  const b = await D.getJSON('josephus/ant/6.json');
+  const ch = b.chapters.find((c) => c[0] === 5);
+  assert(ch && /Nahash/.test(ch[2][0][1]), 'Nahash not found in 6.5.1');
+  const ai = await D.meta.ai();
+  assert((ai.dss_notes['1Sam.10.27'].links || []).some((l) => l[1] === '#/josephus/6.5.1'), 'note has no Josephus link');
+  return ch[2][0][1].slice(0, 90);
+});
 test('Acts 2:17 against the Septuagint: "in the last days" only in Acts, "after these things" only in the LXX', async () => {
   const a = (await D.orig(V('Acts.2.17'))).g.split(/\s+/);
   const b = (await D.lxx(V('Joel.2.28')))[0].split(/\s+/);

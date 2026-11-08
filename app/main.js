@@ -45,6 +45,7 @@ async function route() {
       case 'trail': V.renderTrail(arg); break;
       case 'journey': await V.renderJourney(arg); break;
       case 'scroll': await V.renderScroll(decodeURIComponent(arg), q.get('at')); break;
+      case 'josephus': await V.renderJosephus(arg); break;
       case 'about': await V.renderAbout(q.get('src')); break;
       default: notFound(raw);
     }

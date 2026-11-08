@@ -160,7 +160,9 @@ function dssLegend() {
     .map(([k, t]) => h('span', null, h('span', { class: `sw ${k}` }, 'אבג'), t)));
 }
 function dssNote(note, aiData) {
-  return ai([h('p', null, h('b', null, note.title)), ...note.body.map((p) => h('p', null, p)), h('p', { class: 'small' }, note.editions)], aiData._by);
+  const box = ai([h('p', null, h('b', null, note.title)), ...note.body.map((p) => h('p', null, p)), h('p', { class: 'small' }, note.editions)], aiData._by);
+  for (const [t, href] of note.links || []) box.append(h('p', null, h('a', { class: 'btn small', href }, t)));
+  return box;
 }
 function leonLevy(scroll) {
   const imj = { '1Qisaa': 'isaiah', '1QS': 'community', '1QM': 'war', '11Q19': 'temple', '1QpHab': 'commentary' };
@@ -700,6 +702,25 @@ export async function renderScroll(id, at) {
   Trail.record('scroll', null, `Scroll ${id}${at ? ` ${at}` : ''}`);
 }
 
+// --------------------------------------------------------------------- Josephus (Tier 3)
+export async function renderJosephus(ref) {
+  setView(loading());
+  const [bk, ch, sec] = (ref || '1.1.1').split('.').map(Number);
+  const b = await D.tryJSON(`josephus/ant/${bk}.json`);
+  if (!b) { setView(h('h1', null, 'Josephus'), nodata()); return; }
+  const chapter = b.chapters.find((c) => c[0] === ch) || b.chapters[0];
+  const idx = b.chapters.indexOf(chapter);
+  const prev = idx > 0 ? `${bk}.${b.chapters[idx - 1][0]}.1` : bk > 0 ? `${bk - 1}.1.1` : null;
+  const next = idx < b.chapters.length - 1 ? `${bk}.${b.chapters[idx + 1][0]}.1` : bk < 20 ? `${bk + 1}.1.1` : null;
+  const secs = chapter[2].map(([n, t]) => h('p', { id: `jos-${n}`, style: n === sec ? 'background:var(--t3bg);border-radius:6px;padding:4px' : '' }, h('b', null, `${n}. `), t));
+  setView(h('h1', null, `Josephus, Antiquities ${bk}.${chapter[0]}`), h('p', null, tier(3), 'Jewish background, not Scripture.'),
+    h('p', { class: 'small muted' }, `Book ${bk}: ${b.title}`), h('h2', null, chapter[1] || 'Preface'), h('div', { class: 'card box-t3' }, ...secs),
+    cite(`Josephus, Antiquities of the Jews ${bk}.${chapter[0]} (Whiston's numbering), Project Gutenberg #2848`, ['josephus_ant']),
+    h('div', { class: 'row' }, prev ? h('a', { class: 'btn', href: `#/josephus/${prev}` }, 'Previous chapter') : null, next ? h('a', { class: 'btn', href: `#/josephus/${next}` }, 'Next chapter') : null));
+  if (sec) document.getElementById(`jos-${sec}`)?.scrollIntoView({ block: 'center' });
+  Trail.record('scroll', null, `Josephus, Antiquities ${bk}.${chapter[0]}${sec ? `.${sec}` : ''}`);
+}
+
 // --------------------------------------------------------------------- home and about
 export async function renderHome() {
   const j = await D.meta.journeys();
@@ -770,7 +791,7 @@ export async function renderAbout(focus) {
     h('p', null, 'Every verse, ancient text, link and variant in Threads cites one of these datasets and its exact location.'),
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Source tiers'), h('p', null, tier(1), 'Scripture: the Hebrew and Aramaic Old Testament and the Greek New Testament, with English.'),
       h('p', null, tier(2), 'Textual witnesses: Dead Sea Scrolls biblical manuscripts, Septuagint. What did the text say?'),
-      h('p', null, tier(3), 'Jewish background: Dead Sea Scrolls sectarian texts, Josephus and others. Never presented as Scripture.'),
+      h('p', null, tier(3), 'Jewish background: Dead Sea Scrolls sectarian texts and Josephus. Never presented as Scripture.'),
       h('p', null, tier(4), 'Early church reception: the Ante-Nicene Fathers.'),
       h('p', { class: 'small' }, 'Tiers 2 to 4 can illuminate, confirm or complicate a reading. They can never be the only support for a claim.')),
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'AI-generated text'), ai('Text written by AI looks like this and always carries this label. It is never used in a score.'),
