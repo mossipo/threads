@@ -24,7 +24,7 @@ def roman(s):
 
 
 def clean(t):
-    t = re.sub(r"\s*—\s*", " - ", t)
+    t = re.sub(r"\s*\u2014\s*", " - ", t)
     t = re.sub(r"(?<=[a-z.,;:!?\"'])(\d{1,3})(?=\s|$)", "", t)  # footnote numbers glued to words
     return re.sub(r"\s+", " ", t).strip()
 

@@ -452,7 +452,7 @@ def main():
     write_json("idx/lemma_df.json", {"h": dict(df_h), "g": dict(df_g), "nh": n_h, "ng": n_g, "max_df": MAX_DF})
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "report_xref.json"), "w", encoding="utf-8") as f:
         json.dump({"counts": dict(REPORT), "types": dict(type_count), "examples": EXAMPLES,
-                   "quotes_sample": {f"{k[0]}-{k[1]}": v for k, v in list(quotes.items())[:50]}}, f, ensure_ascii=False, indent=1)
+                   "quotes_sample": {f"{k[0]}-{k[1]}": v for k, v in list(quotes.items())[:50]}}, f, ensure_ascii=True, indent=1)
 
 
 if __name__ == "__main__":

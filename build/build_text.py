@@ -593,7 +593,7 @@ def main():
 
     rep = {"counts": dict(COUNTS), "sizes": dict(sizes), "examples": REPORT}
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "report_text.json"), "w", encoding="utf-8") as f:
-        json.dump(rep, f, ensure_ascii=False, indent=1)
+        json.dump(rep, f, ensure_ascii=True, indent=1)
     print(json.dumps({"counts": dict(COUNTS), "sizes": dict(sizes)}, indent=1))
 
 
