@@ -9,7 +9,7 @@
       ],
       "body": [
         "The Masoretic Text ends the verse 'according to the number of the sons of Israel' (בְּנֵי יִשְׂרָאֵל).",
-        "4QDeut-j (4Q37), fragment 12, line 14, has the letters בני אלוהים, 'sons of God'. In Abegg's transcription both words are preserved letters, while the start of the verse on lines 13 and 14 is the editor's reconstruction.",
+        "4QDeut-j (4Q37), fragment 12, line 14, has the letters בני אלוהים, 'sons of God'. In Abegg's transcription both words are preserved letters. Most of the verse before them, on line 13, is the editor's reconstruction (only בהנחי is preserved there).",
         "The Septuagint (Swete) reads 'according to the number of the angels of God' (ἀγγέλων θεοῦ), which points to a Hebrew text like the scroll's.",
         "The BSB follows the scroll here ('the sons of God'). The KJV and WEB follow the Masoretic Text.",
         "Why it matters: the reading ties the nations to the heavenly 'sons of God' (compare Deut 4:19; Ps 82; Dan 10:13, 20). That is a real textual question, so a claim resting on either reading of this verse has a variant dependency."
@@ -73,9 +73,9 @@
       ],
       "body": [
         "The Septuagint of Jeremiah is about one-seventh shorter than the Masoretic Text and arranges some material differently.",
-        "4QJer-b (4Q71), fragment 1, covers Jeremiah 9:22 to 10:21. Reading its lines in order, the verse labels run 10:4, 10:9, 10:5, 10:11: there is no 10:6, 10:7, 10:8 or 10:10, and verse 9 stands before verse 5. That is the shape of the Septuagint at this point, not the Masoretic one.",
+        "4QJer-b (4Q71), fragment 1, covers Jeremiah 9:23 to 10:21 (9:22 in Hebrew numbering). Reading its lines in order, the verse labels run 10:4, 10:9, 10:5, 10:11: there is no 10:6, 10:7, 10:8 or 10:10, and verse 9 stands before verse 5. That is the shape of the Septuagint at this point, not the Masoretic one.",
         "Caution: much of this fragment is the editor's reconstruction (faded in Threads), and the reconstruction itself follows the Septuagint's order. The preserved letters support the shorter form, but the case rests on few words.",
-        "The verses missing from 4Q71 (10:6 to 8 and 10:10) are praises of the LORD's greatness set against the idols. A claim built on those verses has a variant dependency."
+        "The verses missing from 4Q71 (10:6 to 8 and 10:10) include the praises 'There is none like You, O LORD' and 'the LORD is the true God'. A claim built on those verses has a variant dependency."
       ],
       "editions": "Published in Discoveries in the Judaean Desert XV (1997)."
     }
