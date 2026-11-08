@@ -442,7 +442,7 @@ function pinSave(s) { try { localStorage.setItem(PIN_KEY, JSON.stringify(s)); } 
 export async function renderTest(initial, refHint) {
   const input = h('textarea', { placeholder: 'Type a claim, e.g. "God pours out his Spirit on all flesh"', 'aria-label': 'Claim' }, initial || '');
   const out = h('div');
-  const pinIn = h('input', { type: 'text', placeholder: 'Pin a text: Joel 2:28, or 1QS 4:21' });
+  const pinIn = h('input', { type: 'text', placeholder: 'Pin a text: Joel 2:28, LXX Joel 2:28, or 1QS 4:21' });
   const pinAs = h('select', null, h('option', { value: 'support' }, 'as support'), h('option', { value: 'tension' }, 'as tension'));
   const pinList = h('div', { class: 'chips' });
   const store = pinStore();
@@ -457,9 +457,19 @@ export async function renderTest(initial, refHint) {
     const s = pinIn.value.trim();
     if (!s) return;
     const c = cur();
-    const sm = /^(\d+Q\w*|CD|1QS|1QM|1QHa|11Q\d+)\s+(\S+)$/i.exec(s);
-    if (sm) c.pins.push({ tier: 3, label: s, as: pinAs.value });
-    else {
+    const sm = /^(\d+Q\w*|CD|Mas\w*|Mur\w*|XHev\S*)\s+(\S+)$/i.exec(s);
+    const lx = /^(LXX|Septuagint)\s+(.+)$/i.exec(s);
+    if (sm) {
+      // a biblical scroll is a Tier 2 witness; any other scroll is Tier 3 background
+      const list = await D.meta.scrolls();
+      const row = list.find((r) => r[0].toLowerCase() === sm[1].toLowerCase());
+      const tierN = row && row[2] > row[1] * 0.5 ? 2 : 3;
+      c.pins.push({ tier: tierN, label: s, as: pinAs.value });
+    } else if (lx) {
+      const r = R.parseHuman(lx[2], await D.chapters());
+      if (!r) { toast('Could not read that reference'); return; }
+      c.pins.push({ tier: 2, label: `Septuagint ${R.rangeLabel(r[0], r[1])}`, as: pinAs.value });
+    } else {
       const r = R.parseHuman(s, await D.chapters());
       if (!r) { toast('Could not read that reference'); return; }
       for (const v of await D.passageVerses(r[0], r[1])) c.pins.push({ tier: 1, v, label: R.label(v), as: pinAs.value });
