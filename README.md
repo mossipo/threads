@@ -26,7 +26,7 @@ The rule is enforced in code: Tiers 2 to 4 can illuminate, confirm or complicate
 
 ## AI-generated text
 
-Text written by AI is always labelled "AI-generated" and drawn in a hatched, dashed box, apart from source data. It is never used in a score. In this build AI wrote: the five Dead Sea Scrolls variant notes (Deut 32:8, 1 Sam 10:27 to 11:1, Ps 145:13, Isa 53:11, Jeremiah in 4QJer-b), working translations of four Community Rule passages, short reasons for some Spirit-thread links, and two journey notes. All of it is in `build/ai_content.json`.
+Text written by AI is always labelled "AI-generated" and drawn in a hatched, dashed box, apart from source data. It is never used in a score. In this build AI wrote: the five Dead Sea Scrolls variant notes (Deut 32:8, 1 Sam 10:27 to 11:1, Ps 145:13, Isa 53:11, Jeremiah in 4QJer-b), working translations of four Community Rule passages and of 4Q521 fragment 2 (the 'messianic apocalypse'), short reasons for some Spirit-thread links, and three journey notes. All of it is in `build/ai_content.json`.
 
 ## Sources and licenses
 

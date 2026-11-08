@@ -696,7 +696,9 @@ export async function renderScroll(id, at) {
   }
   const trs = Object.entries(aiData.dss_translations).filter(([, v]) => v.scroll === id);
   setView(h('h1', null, id), h('p', null, tier(3), 'Jewish background, not Scripture. Faded words are the editor\'s reconstruction.', ' ', leonLevy(id)),
-    ...trs.map(([k, v]) => h('details', { class: 'card' }, h('summary', null, `Working translation (AI): ${v.title}`), ai(v.lines.map(([l, e]) => `${l} ${e}`), aiData._by))),
+    ...trs.map(([k, v]) => h('details', { class: 'card' }, h('summary', null, `Working translation (AI): ${v.title}`),
+      ai([h('p', null, h('b', null, 'Working translation (AI), verify against a published edition.')), ...v.lines.map(([l, e]) => h('p', null, h('span', { class: 'small' }, `${l} `), e)), v.note ? h('p', { class: 'small' }, v.note) : null].filter(Boolean), aiData._by),
+      editionRef(k))),
     lines, cite(`ETCBC/dss (Abegg), ${id}. Non-commercial license.`, ['dss']));
   if (at) document.getElementById(`l-${at.replace(':', '-')}`)?.scrollIntoView({ block: 'center' });
   Trail.record('scroll', null, `Scroll ${id}${at ? ` ${at}` : ''}`);
@@ -795,7 +797,7 @@ export async function renderAbout(focus) {
       h('p', null, tier(4), 'Early church reception: the Ante-Nicene Fathers.'),
       h('p', { class: 'small' }, 'Tiers 2 to 4 can illuminate, confirm or complicate a reading. They can never be the only support for a claim.')),
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'AI-generated text'), ai('Text written by AI looks like this and always carries this label. It is never used in a score.'),
-      h('p', { class: 'small' }, 'In this build AI wrote: the five scroll variant notes, the working translations of four Community Rule passages, short reasons for some links on the Spirit thread, and two journey notes.')),
+      h('p', { class: 'small' }, 'In this build AI wrote: the five scroll variant notes, working translations of four Community Rule passages and of 4Q521 fragment 2, short reasons for some links on the Spirit thread, and three journey notes.')),
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Non-commercial terms'), h('p', { class: 'small' }, 'The Dead Sea Scrolls data is licensed CC BY-NC 4.0. Threads must stay non-commercial while it includes that layer.')),
     known, na, list,
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Appearance'), h('div', { class: 'chips' }, ...['auto', 'light', 'dark'].map((t) => h('button', { class: `chip${(settings.theme || 'auto') === t ? ' on' : ''}`, onclick: () => { settings.theme = t; saveSettings(); applyTheme(); renderAbout(); } }, t)))));

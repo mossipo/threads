@@ -16,5 +16,5 @@ First build, 8 November 2026.
 
 - Barry's acceptance tests and preset journey 5b (the specification was cut off).
 - Datasets that were not reachable: Etheridge's Targums, Charles's 1 Enoch and Jubilees, Yonge's Philo, Lightfoot's Apostolic Fathers, the Samaritan Pentateuch.
-- AI link reasons exist for the Spirit thread only; working translations exist for four Community Rule passages only. Everything else shows that no AI text has been written.
+- AI link reasons exist for the Spirit thread only; working translations exist for four Community Rule passages and 4Q521 fragment 2 only. Everything else shows that no AI text has been written.
 - The UBS semantic domains stay out until their license is settled.
