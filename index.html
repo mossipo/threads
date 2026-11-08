@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Threads</title>
+<meta name="description" content="Offline Scripture study on the Hebrew and Greek, with every claim traced to its source.">
+<meta name="theme-color" content="#1b2a41">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Threads">
+<link rel="stylesheet" href="app/styles.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/" aria-label="Threads home">
+    <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><circle cx="16" cy="16" r="4.5" fill="currentColor"/><g stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"><path d="M16 11.5V4"/><path d="M19.8 18.4l6.6 3.8"/><path d="M12.2 18.4l-6.6 3.8"/><circle cx="16" cy="3.5" r="2"/><circle cx="27" cy="22.5" r="2"/><circle cx="5" cy="22.5" r="2"/></g></svg>
+    <span>Threads</span>
+  </a>
+  <form class="go" id="go" autocomplete="off">
+    <input id="go-input" type="search" placeholder="Passage, e.g. Joel 2:28-32" aria-label="Go to a passage" enterkeyhint="go">
+  </form>
+</header>
+<main id="view" tabindex="-1"><p class="loading">Loading</p></main>
+<nav class="tabs" aria-label="Main">
+  <a href="#/" data-tab="home"><span class="ic">⌂</span>Home</a>
+  <a href="#/read" data-tab="read"><span class="ic">¶</span>Read</a>
+  <a href="#/web" data-tab="web"><span class="ic">✳</span>Web</a>
+  <a href="#/test" data-tab="test"><span class="ic">⚖</span>Test</a>
+  <a href="#/trails" data-tab="trails"><span class="ic">⤳</span>Trails</a>
+</nav>
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-backdrop" data-close></div>
+  <section class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet-head"><h2 id="sheet-title"></h2><button class="icon-btn" data-close aria-label="Close">✕</button></div>
+    <div class="sheet-body" id="sheet-body"></div>
+  </section>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script type="module" src="app/main.js"></script>
+</body>
+</html>

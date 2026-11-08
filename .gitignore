@@ -1,0 +1,7 @@
+.cache/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+build/heb_lemma_consonants.json
+build/heb_lemma_pointed.json
