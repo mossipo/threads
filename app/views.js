@@ -14,7 +14,10 @@ export const settings = (() => { try { return JSON.parse(localStorage.getItem(SE
 export function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ } }
 const SRC = { bsb: 'bsb', web: 'openbibles', kjv: 'openbibles', heb: 'stepbible', grk: 'stepbible', sbl: 'sblgnt', lxx: 'lxx', dss: 'dss', anf: 'anf' };
 
-function setView(...kids) { const v = view(); v.replaceChildren(...kids); v.focus({ preventScroll: true }); window.scrollTo(0, 0); }
+// Each screen render takes a ticket; a slower, older render cannot overwrite a newer screen.
+let gen = 0;
+const current = (tk) => tk === gen;
+function setView(tk, ...kids) { if (!current(tk)) return false; const v = view(); v.replaceChildren(...kids); v.focus({ preventScroll: true }); window.scrollTo(0, 0); return true; }
 const refLink = (a, z, txt) => h('a', { href: `#/read/${R.rangeOsis(a, z || a)}` }, txt || R.rangeLabel(a, z || a));
 const isHebWord = (v) => R.parts(v)[0] < R.NT_START;
 function hebLabel(v, hr) { const [b] = R.parts(v); return hr ? `${R.bookName(b)} ${hr.replace('.', ':')}` : R.label(v); }
@@ -198,7 +201,8 @@ export function dssLoc(locs) {
   }).join('; ');
 }
 export const scrollName = (id) => (SIGLA[id] ? `${id} (${SIGLA[id]})` : id);
-const clean = (g) => (g || '').replace(/\//g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+// glosses lose STEPBible's own brackets here, so square brackets can mark the editor's restorations
+const clean = (g) => (g || '').replace(/\//g, '').replace(/[<>[\]]/g, '').replace(/\s+/g, ' ').trim();
 function dssWitness(v, r, o) {
   const mtw = o ? o.w.filter((w) => !/^[XR]/.test(w[6])) : [];
   // English first: each scroll word in English, with the differences marked
@@ -248,7 +252,8 @@ async function anfSheet(v, refs) {
 
 // --------------------------------------------------------------------- reader
 export async function renderReader(a, z) {
-  setView(loading());
+  const tk = ++gen;
+  setView(tk, loading());
   const vs = await D.passageVerses(a, z);
   const [ca, cz] = await D.contextRange(a, z, 3);
   const head = h('div', null, h('h1', null, R.rangeLabel(a, z)));
@@ -267,14 +272,14 @@ export async function renderReader(a, z) {
     for (const v of before.reverse()) list.prepend(await verseBlock(v, { ctx: true }));
     for (const v of after) list.append(await verseBlock(v, { ctx: true }));
   } }, 'Show 3 verses of context on each side');
-  setView(head, toggles, h('p', null, ctxBtn), list, nav(a, z, await D.chapters()));
+  setView(tk, head, toggles, h('p', null, ctxBtn), list, nav(a, z, await D.chapters()));
   for (const v of vs) {
     // a Psalm title stands before verse 1 (in the Hebrew it is part of the text, often verse 1)
     const [b, c, n] = R.parts(v);
     if (n === 1 && b === R.bookIndex('Ps') && await D.text(R.vid(b, c, 0))) list.append(await verseBlock(R.vid(b, c, 0)));
     list.append(await verseBlock(v));
   }
-  Trail.record('passage', R.rangeOsis(a, z), R.rangeLabel(a, z));
+  if (current(tk)) Trail.record('passage', R.rangeOsis(a, z), R.rangeLabel(a, z));
 }
 function nav(a, z, chs) {
   const [b, c] = R.parts(a);
@@ -288,7 +293,8 @@ function nav(a, z, chs) {
 
 // --------------------------------------------------------------------- constellation
 export async function renderWeb(a, z) {
-  setView(loading('Gathering links'));
+  const tk = ++gen;
+  setView(tk, loading('Gathering links'));
   const links = await linksFor(a, z);
   const top = links.slice(0, 24);
   const nodes = top.map((l) => ({ ...l, label: R.rangeLabel(l.b0, l.b1), short: shortRef(l.b0, l.b1) }));
@@ -296,7 +302,7 @@ export async function renderWeb(a, z) {
   const graph = h('div', { class: 'graph-wrap' });
   const leg = h('details', { class: 'card' }, h('summary', null, 'Legend'), legend());
   const listEl = h('div');
-  setView(
+  setView(tk, 
     h('h1', null, `Web: ${R.rangeLabel(a, z)}`),
     h('div', { class: 'row' }, h('a', { class: 'btn', href: `#/read/${R.rangeOsis(a, z)}` }, 'Read'), h('a', { class: 'btn', href: `#/test?ref=${R.rangeOsis(a, z)}` }, 'Test a claim')),
     h('p', { class: 'small muted' }, `Showing the ${nodes.length} strongest of ${links.length} links. Tap a line to see how it was scored, or a node to read it in context.`),
@@ -339,7 +345,9 @@ async function witnessNodes(a, z) {
     const k = p[1];
     if (!works.has(k)) works.set(k, v);
   }
-  for (const [author, v] of [...works.entries()].slice(0, 7)) out.push({ tier: 4, short: author.replace(/\.$/, '').slice(0, 16), label: author, open: async () => anfSheet(v, await D.anfRefs(v)) });
+  // short ring labels: the author's first name in title case (CLEMENT OF ALEXANDRIA becomes Clement)
+  const shortName = (a) => { const w = a.replace(/\.$/, '').split(/[\s,]+/)[0] || a; return w.length > 3 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w.slice(0, 12); };
+  for (const [author, v] of [...works.entries()].slice(0, 7)) out.push({ tier: 4, short: shortName(author), label: author, open: async () => anfSheet(v, await D.anfRefs(v)) });
   return out;
 }
 async function lxxPassageSheet(vs) {
@@ -397,7 +405,8 @@ async function edgeSheet(n) {
 
 // --------------------------------------------------------------------- word thread
 export async function renderWord(dkey, ctx) {
-  setView(loading());
+  const tk = ++gen;
+  setView(tk, loading());
   const pk = D.plainKey(dkey);
   const heb = pk[0] === 'H';
   const [entry, b] = await Promise.all([D.lexEntry(dkey), D.brief(dkey)]);
@@ -480,7 +489,7 @@ export async function renderWord(dkey, ctx) {
     } else dssBox.append(nodata());
     dssBox.append(cite('ETCBC/dss (Abegg) lexemes. Non-commercial license.', ['dss']));
   } else dssBox.append(nodata(heb ? 'no data' : 'The scrolls are Hebrew and Aramaic; see the Hebrew equivalents above.'));
-  setView(head, tabs, lexBox, h('h2', null, 'Every occurrence'), senseChips, occBox,
+  setView(tk, head, tabs, lexBox, h('h2', null, 'Every occurrence'), senseChips, occBox,
     h('h2', null, tier(2), heb ? 'Septuagint equivalents' : 'Hebrew words it renders in the Septuagint'), eqBox,
     h('h2', null, tier(2), 'In the Dead Sea Scrolls'), dssBox);
   if (lexes.length) showLex(0); else lexBox.append(nodata());
@@ -492,6 +501,7 @@ const PIN_KEY = 'threads.pins.v1';
 function pinStore() { try { return JSON.parse(localStorage.getItem(PIN_KEY)) || {}; } catch { return {}; } }
 function pinSave(s) { try { localStorage.setItem(PIN_KEY, JSON.stringify(s)); } catch { /* ignore */ } }
 export async function renderTest(initial, refHint) {
+  const tk = ++gen;
   const input = h('textarea', { placeholder: 'Type a claim, e.g. "God pours out his Spirit on all flesh"', 'aria-label': 'Claim' }, initial || '');
   const out = h('div');
   const pinIn = h('input', { type: 'text', placeholder: 'Pin a text: Joel 2:28, LXX Joel 2:28, 1QS 4:21, 1 Enoch 1:9', 'aria-label': 'Text to pin' });
@@ -541,7 +551,7 @@ export async function renderTest(initial, refHint) {
     out.replaceChildren(...(await claimReport(res, c, () => { store[keyOf()] = c; pinSave(store); run(); })));
     Trail.record('claim', null, claim, { summary: res.weight });
   };
-  setView(h('h1', null, 'Does the text bear it?'),
+  setView(tk, h('h1', null, 'Does the text bear it?'),
     h('p', { class: 'small muted' }, 'Threads looks for supporting texts, tension texts, variant dependencies and tier warnings. It shows the evidence and its weight. It never says whether a claim is true; that discernment is yours.'),
     input, h('div', { class: 'row', style: 'margin:8px 0' }, h('button', { class: 'btn primary', onclick: run }, 'Test the claim')),
     h('details', { class: 'card' }, h('summary', null, 'Pin or remove texts by hand'), h('div', { class: 'row' }, pinIn, pinAs, h('button', { class: 'btn', onclick: addPin }, 'Pin')), pinList),
@@ -649,6 +659,7 @@ async function claimReport(res, c, rerun) {
 
 // --------------------------------------------------------------------- trails
 export function renderTrails() {
+  const tk = ++gen;
   const list = h('div');
   const draw = () => {
     const act = Trail.active();
@@ -658,12 +669,25 @@ export function renderTrails() {
     if (!Trail.trails().length) list.append(h('p', { class: 'muted' }, 'No trails yet. Every passage, web, word and claim you open is recorded into the active trail.'));
   };
   const rec = h('button', { class: `chip${Trail.isRecording() ? ' on' : ''}`, onclick: () => { Trail.setRecording(!Trail.isRecording()); renderTrails(); } }, Trail.isRecording() ? 'Recording on' : 'Recording off');
-  setView(h('h1', null, 'Study trails'), h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: () => { const n = prompt('Name for the new trail'); if (n !== null) { Trail.create(n.trim() || undefined); draw(); } } }, 'New trail'), rec), list);
+  const file = h('input', { type: 'file', accept: 'application/json,.json', 'aria-label': 'Backup file to restore', style: 'display:none' });
+  file.addEventListener('change', async () => {
+    const f = file.files && file.files[0];
+    if (!f) return;
+    try { const r = Trail.restore(await f.text()); toast(`Restored: ${r.trailsAdded} trail${r.trailsAdded === 1 ? '' : 's'} added, ${r.other} other item${r.other === 1 ? '' : 's'} (pins, edition references, settings)`); draw(); } catch (e) { toast(`Could not restore: ${e.message}`); }
+    file.value = '';
+  });
+  const backupCard = h('details', { class: 'card' }, h('summary', null, 'Back up or restore'),
+    h('p', { class: 'small muted' }, 'Trails, notes, pinned texts, your edition page references and settings live on this device only. A backup file keeps them safe and moves them to another device. Restoring adds trails you do not already have.'),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn', onclick: () => Trail.download(`threads-backup-${new Date().toISOString().slice(0, 10)}.json`, Trail.backup(), 'application/json') }, 'Download a backup'),
+      h('button', { class: 'btn', onclick: () => file.click() }, 'Restore from a file'), file));
+  setView(tk, h('h1', null, 'Study trails'), h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: () => { const n = prompt('Name for the new trail'); if (n !== null) { Trail.create(n.trim() || undefined); draw(); } } }, 'New trail'), rec), list, backupCard);
   draw();
 }
 export function renderTrail(id) {
+  const tk = ++gen;
   const t = Trail.get(id);
-  if (!t) { setView(h('p', null, 'Trail not found.')); return; }
+  if (!t) { setView(tk, h('p', null, 'Trail not found.')); return; }
   const steps = h('div');
   const draw = () => {
     steps.replaceChildren(...t.steps.map((st, i) => {
@@ -679,7 +703,7 @@ export function renderTrail(id) {
   const preview = h('pre', { class: 'card small', style: 'white-space:pre-wrap;display:none' });
   const show = (txt) => { preview.textContent = txt; preview.style.display = 'block'; };
   const safe = t.name.replace(/[^\w-]+/g, '_');
-  setView(h('h1', null, t.name),
+  setView(tk, h('h1', null, t.name),
     h('div', { class: 'row' },
       h('button', { class: 'btn', onclick: () => { const n = prompt('Rename trail', t.name); if (n) { Trail.rename(id, n); renderTrail(id); } } }, 'Rename'),
       h('button', { class: 'btn', onclick: () => { const md = Trail.toMarkdown(t); show(md); Trail.download(`${safe}.md`, md, 'text/markdown'); } }, 'Export Markdown'),
@@ -693,17 +717,19 @@ export function renderTrail(id) {
 
 // --------------------------------------------------------------------- journeys
 export async function renderJourney(id) {
-  setView(loading());
+  const tk = ++gen;
+  setView(tk, loading());
   const all = await D.meta.journeys();
   const j = all[id];
   const aiData = await D.meta.ai();
-  if (!j) { setView(h('p', null, 'Journey not found.')); return; }
+  if (!j) { setView(tk, h('p', null, 'Journey not found.')); return; }
   const out = [h('h1', null, j.title), h('p', { class: 'muted' }, j.summary),
     h('button', { class: 'btn', onclick: () => { for (const s of j.steps) Trail.record('journey', s.ref || null, `${j.title}: ${s.title}`); toast('Journey added to your trail'); } }, 'Add the whole journey to my trail')];
-  setView(...out);
+  setView(tk, ...out);
   const v = view();
   let n = 0;
   for (const s of j.steps) {
+    if (!current(tk)) return;
     n += 1;
     const sec = h('section', { class: 'card' }, h('h2', null, `${n}. ${s.title}`));
     v.append(sec);
@@ -736,7 +762,7 @@ async function hebLxxTable(ref) {
   const tb = h('table', { class: 'cmp' }, h('tr', null, h('th', null, 'Verse'), h('th', null, 'Hebrew, word by word in English, then the BSB'), h('th', null, tier(2, true), 'Septuagint in English (Brenton)')));
   for (const v of await D.passageVerses(a, z)) {
     const [o, lx, hr] = await Promise.all([D.orig(v), D.lxx(v), D.hebRef(v)]);
-    const lit = o ? o.w.map((w) => (w[2] || '').replace(/\//g, '').replace(/<[^>]*>/g, '').trim()).filter(Boolean).join(' ') : '';
+    const lit = o ? o.w.map((w) => (w[2] || '').replace(/\//g, '').replace(/<[^>]*>/g, '').trim()).filter(Boolean).join(' ').replace(/- -/g, '') : '';
     tb.append(h('tr', null, h('td', null, h('b', null, R.keyOf(v)), hr ? h('div', { class: 'note-heb' }, `Heb ${hr.replace('.', ':')}`) : null, lx && lx[2] ? h('div', { class: 'note-heb' }, `LXX ${lx[2]}`) : null),
       h('td', null, h('div', { class: 'lit-line' }, lit), h('div', { class: 'small' }, 'BSB: ', await D.bsbText(v)),
         o ? h('details', null, h('summary', { class: 'small' }, 'Hebrew'), h('div', { class: 'heb-text' }, o.w.map((w) => w[0]).join(' '))) : null),
@@ -808,10 +834,11 @@ function editionRef(p) {
 
 // --------------------------------------------------------------------- scroll view
 export async function renderScroll(id, at) {
-  setView(loading());
+  const tk = ++gen;
+  setView(tk, loading());
   const t = await D.scrollText(id);
   const aiData = await D.meta.ai();
-  if (!t) { setView(h('h1', null, id), h('p', null, 'This scroll is biblical; open its verses in the reader to see it beside the Masoretic Text.')); return; }
+  if (!t) { setView(tk, h('h1', null, id), h('p', null, 'This scroll is biblical; open its verses in the reader to see it beside the Masoretic Text.')); return; }
   const lines = h('div');
   for (const [fr, ln, words] of t.lines) {
     const here = at && at === `${fr}:${ln}`;
@@ -819,7 +846,7 @@ export async function renderScroll(id, at) {
       ...words.map(([w, r]) => h('span', { class: `sw ${r === 1 ? 'r' : ''}${r === 2 ? ' part' : ''}` }, w)).flatMap((x) => [x, ' '])));
   }
   const trs = Object.entries(aiData.dss_translations).filter(([, v]) => v.scroll === id);
-  setView(h('h1', null, id), h('p', null, tier(3), 'Jewish background, not Scripture. Faded words are the editor\'s reconstruction.', ' ', leonLevy(id)),
+  setView(tk, h('h1', null, id), h('p', null, tier(3), 'Jewish background, not Scripture. Faded words are the editor\'s reconstruction.', ' ', leonLevy(id)),
     ...trs.map(([k, v]) => h('details', { class: 'card' }, h('summary', null, `Working translation (AI): ${v.title}`),
       ai([h('p', null, h('b', null, 'Working translation (AI), verify against a published edition.')), ...v.lines.map(([l, e]) => h('p', null, h('span', { class: 'small' }, `${l} `), e)), v.note ? h('p', { class: 'small' }, v.note) : null].filter(Boolean), aiData._by),
       editionRef(k))),
@@ -830,16 +857,17 @@ export async function renderScroll(id, at) {
 
 // --------------------------------------------------------------------- Josephus (Tier 3)
 export async function renderJosephus(ref) {
-  setView(loading());
+  const tk = ++gen;
+  setView(tk, loading());
   const [bk, ch, sec] = (ref || '1.1.1').split('.').map(Number);
   const b = await D.tryJSON(`josephus/ant/${bk}.json`);
-  if (!b) { setView(h('h1', null, 'Josephus'), nodata()); return; }
+  if (!b) { setView(tk, h('h1', null, 'Josephus'), nodata()); return; }
   const chapter = b.chapters.find((c) => c[0] === ch) || b.chapters[0];
   const idx = b.chapters.indexOf(chapter);
   const prev = idx > 0 ? `${bk}.${b.chapters[idx - 1][0]}.1` : bk > 0 ? `${bk - 1}.1.1` : null;
   const next = idx < b.chapters.length - 1 ? `${bk}.${b.chapters[idx + 1][0]}.1` : bk < 20 ? `${bk + 1}.1.1` : null;
   const secs = chapter[2].map(([n, t]) => h('p', { id: `jos-${n}`, style: n === sec ? 'background:var(--t3bg);border-radius:6px;padding:4px' : '' }, h('b', null, `${n}. `), t));
-  setView(h('h1', null, `Josephus, Antiquities ${bk}.${chapter[0]}`), h('p', null, tier(3), 'Jewish background, not Scripture.'),
+  setView(tk, h('h1', null, `Josephus, Antiquities ${bk}.${chapter[0]}`), h('p', null, tier(3), 'Jewish background, not Scripture.'),
     h('p', { class: 'small muted' }, `Book ${bk}: ${b.title}`), h('h2', null, chapter[1] || 'Preface'), h('div', { class: 'card box-t3' }, ...secs),
     cite(`Josephus, Antiquities of the Jews ${bk}.${chapter[0]} (Whiston's numbering), Project Gutenberg #2848`, ['josephus_ant']),
     h('div', { class: 'row' }, prev ? h('a', { class: 'btn', href: `#/josephus/${prev}` }, 'Previous chapter') : null, next ? h('a', { class: 'btn', href: `#/josephus/${next}` }, 'Next chapter') : null));
@@ -849,9 +877,10 @@ export async function renderJosephus(ref) {
 
 // --------------------------------------------------------------------- home and about
 export async function renderHome() {
+  const tk = ++gen;
   const j = await D.meta.journeys();
   const act = Trail.active();
-  setView(h('h1', null, 'Threads'),
+  setView(tk, h('h1', null, 'Threads'),
     h('p', null, 'Scripture study on the Hebrew and Greek, with every verse, link and variant traced to its source. Threads shows evidence and its weight; the discernment is yours.'),
     h('div', { class: 'card' }, h('h2', { style: 'margin-top:0' }, 'Start'), h('div', { class: 'chips' },
       ...[['Joel.2.28-Joel.2.32', 'Joel 2:28-32'], ['Acts.2.1-Acts.2.21', 'Acts 2:1-21'], ['1Cor.12.8-1Cor.12.10', '1 Cor 12:8-10'], ['Isa.53.11', 'Isa 53:11'], ['Deut.32.8', 'Deut 32:8']]
@@ -892,7 +921,8 @@ async function offlinePanel() {
   return box;
 }
 export async function renderAbout(focus) {
-  setView(loading());
+  const tk = ++gen;
+  setView(tk, loading());
   const src = await D.meta.sources();
   const checks = await D.meta.checks();
   const focusIds = new Set((focus || '').split(',').filter(Boolean));
@@ -905,6 +935,7 @@ export async function renderAbout(focus) {
       h('div', { class: 'small' }, `Changes: ${s.changes}`),
       h('div', { class: 'small muted' }, 'Pinned: ', h('a', { href: `https://github.com/${s.repo}/tree/${s.commit}`, target: '_blank', rel: 'noopener' }, `${s.repo}@${s.commit.slice(0, 10)}`))));
   }
+  const fonts = h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Fonts (bundled for offline use)'), h('ul', { class: 'small' }, (src.assets || []).map((x) => h('li', null, h('b', null, x.name), `, ${x.by}. ${x.version}. `, h('a', { href: x.file }, x.license)))));
   const na = h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Not in this build'), h('ul', { class: 'small' }, src.not_available.map((x) => h('li', null, h('b', null, x.name), `: ${x.reason}`))));
   const c = checks.text ? checks.text.counts : {};
   const known = h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Known data issues found by the build checks'), h('ul', { class: 'small' },
@@ -913,7 +944,7 @@ export async function renderAbout(focus) {
     h('li', null, `SBLGNT and STEPBible TAGNT: ${c.tagnt_sbl_wordset_match || 0} verses match word for word; ${c.tagnt_sbl_wordset_mismatch || 0} differ, mostly spelling (movable nu, NA28 against SBL spelling) and verse-break placement.`),
     h('li', null, 'Scroll comparison: matched by letters, neutralising common scroll spellings. English for scroll-only words comes from a dictionary-form match and may be imprecise.'),
     h('li', null, 'STEPBible Hebrew includes words reconstructed from the Septuagint (type X) at a few places such as Psalm 145:13 and 1 Samuel 14:41. Threads marks them and never counts them as Masoretic.')));
-  setView(h('h1', null, 'Sources and licenses'),
+  setView(tk, h('h1', null, 'Sources and licenses'),
     h('p', null, 'Every verse, ancient text, link and variant in Threads cites one of these datasets and its exact location.'),
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Source tiers'), h('p', null, tier(1), 'Scripture: the Hebrew and Aramaic Old Testament and the Greek New Testament, with English.'),
       h('p', null, tier(2), 'Textual witnesses: Dead Sea Scrolls biblical manuscripts, Septuagint. What did the text say?'),
@@ -921,9 +952,10 @@ export async function renderAbout(focus) {
       h('p', null, tier(4), 'Early church reception: the Ante-Nicene Fathers.'),
       h('p', { class: 'small' }, 'Tiers 2 to 4 can illuminate, confirm or complicate a reading. They can never be the only support for a claim.')),
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'AI-generated text'), ai('Text written by AI looks like this and always carries this label. It is never used in a score.'),
-      h('p', { class: 'small' }, 'In this build AI wrote: the five scroll variant notes, working translations of four Community Rule passages and of 4Q521 fragment 2, short reasons for some links on the Spirit thread, and three journey notes.')),
+      h('p', { class: 'small' }, 'In this build AI wrote: the five scroll variant notes, working translations of four Community Rule passages and of 4Q521 fragment 2, short reasons for some links on the Spirit thread, and seven journey notes. Everything else is source data or computed from it.')),
+    h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Punctuation'), h('p', { class: 'small' }, 'Bible texts keep every character of their source, including the em dashes the BSB, Brenton and the SBLGNT use. In non-biblical sources (Josephus, the Fathers, the topical indexes) an em dash is shown as a spaced hyphen; the words are unchanged.')),
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Non-commercial terms'), h('p', { class: 'small' }, 'The Dead Sea Scrolls data is licensed CC BY-NC 4.0. Threads must stay non-commercial while it includes that layer.')),
-    known, na, list,
+    known, na, fonts, list,
     h('div', { class: 'card' }, h('h3', { style: 'margin-top:0' }, 'Appearance'), h('div', { class: 'chips' }, ...['auto', 'light', 'dark'].map((t) => h('button', { class: `chip${(settings.theme || 'auto') === t ? ' on' : ''}`, onclick: () => { settings.theme = t; saveSettings(); applyTheme(); renderAbout(); } }, t)))));
   if (focusIds.size) document.getElementById(`src-${[...focusIds][0]}`)?.scrollIntoView({ block: 'start' });
 }

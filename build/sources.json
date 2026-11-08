@@ -21,7 +21,7 @@
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
       "attribution": "Data created by Tyndale House Cambridge and STEPBible.org. Source: https://STEPBible.github.io/STEPBible-Data/",
       "changes": "Reformatted into per-book JSON. Words, glosses, Strong's tags, grammar codes, edition lists and variant markers are carried over unchanged.",
-      "used_for": "Hebrew and Greek words, glosses, dStrong tags, grammar, edition and variant markers, Hebrew verse numbering, brief lexicons"
+      "used_for": "Hebrew and Greek words, glosses, dStrong tags, grammar, edition and variant markers, Hebrew verse numbering, brief lexicons; TVTMS versification for the self-test's Psalm numbering check"
     },
     {
       "id": "sblgnt",
@@ -242,7 +242,7 @@
       "license": "CC BY (OpenBible.info, data dated 2024-11-04)",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
       "attribution": "Cross references from OpenBible.info (https://www.openbible.info/labs/cross-references/), CC BY. Unmodified copy as mirrored by scrollmapper/bible_databases.",
-      "changes": "Re-keyed by verse. Vote counts unchanged.",
+      "changes": "Re-keyed by verse. Vote counts unchanged and kept per direction: a link shows the votes for each direction, and its score uses the larger.",
       "used_for": "Cross-reference links and their vote counts; also a full-text copy of the BSB used to check and fill the BSB"
     },
     {
@@ -277,8 +277,8 @@
       "license": "Nave (1896) and Torrey (1897) public domain; structured data MIT",
       "license_url": "https://opensource.org/licenses/MIT",
       "attribution": "Orville J. Nave, Nave's Topical Bible; R. A. Torrey, The New Topical Text Book. Structured and audited by John Schroeder (topical-bible-search, MIT).",
-      "changes": "Topics and references re-keyed into a search index.",
-      "used_for": "Offline claim search"
+      "changes": "Topics and references re-keyed into a search index. Entry text is kept word for word, except that em dashes are shown as spaced hyphens (the rule for all non-biblical sources in Threads). Nave's QUOTATIONS AND ALLUSIONS pairs also add points (N) to cross-reference links and mark them at least as clear allusions.",
+      "used_for": "Offline claim search; typology links; Nave's quotation list in link scores"
     },
     {
       "id": "anf",
@@ -294,7 +294,7 @@
       "license": "Public domain (1885 to 1896 translations), from CCEL.org ThML files",
       "license_url": "https://ccel.org/",
       "attribution": "Roberts, Donaldson and Coxe (eds.), The Ante-Nicene Fathers, from the Christian Classics Ethereal Library ThML edition.",
-      "changes": "Scripture references marked in the CCEL edition are indexed by verse.",
+      "changes": "Scripture references marked in the CCEL edition are indexed by verse. Paragraph text is kept word for word, except that em dashes are shown as spaced hyphens.",
       "used_for": "Early church reception (Tier 4)"
     },
     {
@@ -343,6 +343,44 @@
     {
       "name": "UBS semantic domains (SDBH, SDBG/MARBLE) inside MACULA",
       "reason": "Marked 'used with permission' for Clear Bible. No open license for redistribution. Excluded until Barry decides."
+    },
+    {
+      "name": "Ezra SIL (the Hebrew font named in the specification)",
+      "reason": "Open licensed (SIL OFL), but not on npm and SIL's download site is not reachable from the build environment. Noto Serif Hebrew (OFL) is bundled instead; Ezra SIL is used first whenever it is installed on the device. To bundle it, add its .woff2 to fonts/ and an @font-face rule for 'Ezra SIL' in app/styles.css."
+    }
+  ],
+  "assets": [
+    {
+      "name": "Gentium Book Plus (English Scripture text)",
+      "by": "SIL International",
+      "version": "@fontsource/gentium-book-plus 5.3.0",
+      "license": "SIL Open Font License 1.1",
+      "license_url": "https://openfontlicense.org",
+      "file": "fonts/LICENSE-Gentium-Book-Plus.txt"
+    },
+    {
+      "name": "Gentium Plus (Greek)",
+      "by": "SIL International",
+      "version": "@fontsource/gentium-plus 5.3.0",
+      "license": "SIL Open Font License 1.1",
+      "license_url": "https://openfontlicense.org",
+      "file": "fonts/LICENSE-Gentium-Plus.txt"
+    },
+    {
+      "name": "Noto Serif Hebrew (Hebrew; Ezra SIL is used instead when it is installed on the device)",
+      "by": "Google and the Noto project",
+      "version": "@fontsource/noto-serif-hebrew 5.3.0",
+      "license": "SIL Open Font License 1.1",
+      "license_url": "https://openfontlicense.org",
+      "file": "fonts/LICENSE-Noto-Serif-Hebrew.txt"
+    },
+    {
+      "name": "Atkinson Hyperlegible (interface)",
+      "by": "Braille Institute of America",
+      "version": "@fontsource/atkinson-hyperlegible 5.3.0",
+      "license": "SIL Open Font License 1.1",
+      "license_url": "https://openfontlicense.org",
+      "file": "fonts/LICENSE-Atkinson-Hyperlegible.txt"
     }
   ]
 }

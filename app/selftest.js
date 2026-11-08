@@ -427,6 +427,27 @@ test('Sermon skeleton: GOD comes from the trail; ME, WE, YOU and WE are prompts 
   }
   return 'headings ME, WE, GOD, YOU, WE';
 });
+test('Backup and restore: trails with notes, pins, edition references and settings come back from the JSON file', async () => {
+  const keys = ['threads.trails.v1', 'threads.pins.v1', 'threads.settings.v1', 'threads.edition.selftest'];
+  const saved = Object.fromEntries(keys.map((k) => { try { return [k, localStorage.getItem(k)]; } catch { return [k, null]; } }));
+  try {
+    const T = await import('./trail.js');
+    localStorage.setItem('threads.pins.v1', JSON.stringify({ 'test claim': { pins: [{ tier: 3, label: '1 Enoch 8:1', as: 'support' }], removed: [] } }));
+    localStorage.setItem('threads.edition.selftest', 'Vermes p. 412');
+    const t = T.create('Self-test trail'); T.record('passage', 'Joel.2.28', 'Joel 2:28'); T.annotate(t.id, 0, 'my note');
+    const file = T.backup();
+    T.remove(t.id); localStorage.removeItem('threads.pins.v1'); localStorage.removeItem('threads.edition.selftest');
+    const r = T.restore(file);
+    const back = T.get(t.id);
+    assert(back && back.steps[0].note === 'my note', 'trail or note not restored');
+    assert(JSON.parse(localStorage.getItem('threads.pins.v1'))['test claim'].pins[0].label === '1 Enoch 8:1', 'pins not restored');
+    assert(localStorage.getItem('threads.edition.selftest') === 'Vermes p. 412', 'edition reference not restored');
+    T.remove(t.id);
+    return `${r.trailsAdded} trail and ${r.other} other items restored from a ${file.length}-character backup`;
+  } finally {
+    for (const [k, v] of Object.entries(saved)) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* ignore */ } }
+  }
+});
 test('Sources: every dataset is pinned to a commit and carries a license and attribution', async () => {
   const s = await D.meta.sources();
   for (const x of s.sources) assert(/^[0-9a-f]{40}$/.test(x.commit) && x.license && x.attribution && x.license_url, x.id);
@@ -452,6 +473,51 @@ test('Reader: every verse shown carries a citation, and the semantic domain says
   await waitFor(() => /Semantic domain/.test(w.document.getElementById('sheet-body').textContent));
   assert(/no data/.test(w.document.getElementById('sheet-body').textContent), 'domain not "no data"');
   return `${verses.length} verses, each cited`;
+});
+test('Colour contrast meets WCAG AA (4.5:1) for text in both light and dark modes', async () => {
+  const f = document.getElementById('app');
+  await loadFrame(f, 'index.html#/', (doc) => doc.querySelector('h1'));
+  const lum = (hex) => { const n = hex.trim().replace('#', ''); const c = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const pairs = [['--ink', '--bg'], ['--ink', '--panel'], ['--muted', '--bg'], ['--muted', '--panel'], ['--gold', '--bg'], ['--gold', '--panel'], ['--gold-ink', '--gold'],
+    ['--t1', '--t1bg'], ['--t2', '--t2bg'], ['--t3', '--t3bg'], ['--t4', '--t4bg'], ['--panel', '--ai'], ['--ai', '--aibg'], ['--warn', '--bg'], ['--ink', '--raise'], ['--bar-ink', '--bar'], ['--bar-gold', '--bar']];
+  const out = []; const bad = [];
+  const root = f.contentDocument.documentElement;
+  const before = root.getAttribute('data-theme');
+  for (const theme of ['light', 'dark']) {
+    root.setAttribute('data-theme', theme);
+    const cs = f.contentWindow.getComputedStyle(root);
+    let min = 99;
+    for (const [a, b] of pairs) {
+      const r = ratio(cs.getPropertyValue(a), cs.getPropertyValue(b));
+      min = Math.min(min, r);
+      if (r < 4.5) bad.push(`${theme} ${a} on ${b}: ${r.toFixed(2)}`);
+    }
+    out.push(`${theme}: lowest ${min.toFixed(1)}:1 over ${pairs.length} pairs`);
+  }
+  if (before) root.setAttribute('data-theme', before); else root.removeAttribute('data-theme');
+  assert(!bad.length, bad.join('; '));
+  return out.join('; ');
+});
+test('Constellation: drag moves the web, the buttons zoom, and every node has a 44px tap area', async () => {
+  const f = document.getElementById('app');
+  const w = await loadFrame(f, 'index.html#/web/Joel.2.28', (doc) => doc.querySelector('.graph-wrap svg .viewport'));
+  const doc = w.document;
+  const svg = doc.querySelector('.graph-wrap svg'); const vp = svg.querySelector('.viewport');
+  const box = svg.getBoundingClientRect();
+  const ev = (type, x, y) => svg.dispatchEvent(new w.PointerEvent(type, { pointerId: 1, clientX: x, clientY: y, bubbles: true, pointerType: 'touch' }));
+  ev('pointerdown', box.left + 50, box.top + 50); ev('pointermove', box.left + 90, box.top + 80); ev('pointerup', box.left + 90, box.top + 80);
+  const afterDrag = vp.getAttribute('transform') || '';
+  assert(/translate\((?!0,0\))/.test(afterDrag), `drag did not move the web: ${afterDrag}`);
+  doc.querySelector('.graph-tools button[aria-label="Zoom in"]').click();
+  const zoomed = vp.getAttribute('transform');
+  assert(/scale\(1\.3/.test(zoomed), `zoom: ${zoomed}`);
+  doc.querySelector('.graph-tools button[aria-label="Reset view"]').click();
+  const scale = box.width / 780;
+  const sizes = [...svg.querySelectorAll('g[role=button]')].map((g) => { const c = g.querySelector('circle'); return c ? +c.getAttribute('r') * 2 * scale : 0; });
+  const small = sizes.filter((x) => x < 43.5).length;
+  assert(!small, `${small} nodes have tap areas under 44px at ${Math.round(box.width)}px wide`);
+  return `drag moved the web to ${afterDrag.replace(/(\d)\.\d+/g, '$1')}; zoom in gave ${zoomed.match(/scale\([^)]*\)/)[0]}; ${sizes.length} nodes, each with a tap area at least ${Math.floor(Math.min(...sizes))}px across on a ${Math.round(box.width)}px wide graph`;
 });
 test('Speed: Psalm 119 renders within 1 second once its data is cached', async () => {
   const f = document.getElementById('app');

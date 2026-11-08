@@ -1,11 +1,12 @@
 // Threads service worker: the app shell is stored at install; data files are stored as they are
 // used (or all at once from Home). Bump SHELL when app files change and DATA when data is rebuilt.
-const SHELL = 'threads-shell-v2';
+const SHELL = 'threads-shell-v3';
 const DATA = 'threads-data-v2';
 const SHELL_FILES = [
   './', 'index.html', 'selftest.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'app/styles.css', 'app/main.js', 'app/views.js', 'app/data.js', 'app/refs.js', 'app/ui.js', 'app/trail.js',
   'app/links.js', 'app/graph.js', 'app/claim.js', 'app/editions.js', 'app/selftest.js',
+  'fonts/atkinson-hyperlegible-latin-400-italic.woff2', 'fonts/atkinson-hyperlegible-latin-400-normal.woff2', 'fonts/atkinson-hyperlegible-latin-700-normal.woff2', 'fonts/atkinson-hyperlegible-latin-ext-400-normal.woff2', 'fonts/gentium-book-plus-latin-400-italic.woff2', 'fonts/gentium-book-plus-latin-400-normal.woff2', 'fonts/gentium-book-plus-latin-700-normal.woff2', 'fonts/gentium-book-plus-latin-ext-400-normal.woff2', 'fonts/gentium-book-plus-latin-ext-700-normal.woff2', 'fonts/gentium-plus-greek-400-normal.woff2', 'fonts/gentium-plus-greek-ext-400-normal.woff2', 'fonts/noto-serif-hebrew-hebrew-400-normal.woff2',
   'data/idx/verses.json', 'data/meta/sources.json', 'data/meta/files.json', 'data/meta/checks.json', 'data/ai/ai.json', 'data/journeys/journeys.json',
 ];
 

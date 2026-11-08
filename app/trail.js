@@ -47,6 +47,54 @@ export function record(kind, ref, text, data) {
   return t;
 }
 
+// ---------------- backup and restore: trails with their notes, pins, edition page references, settings
+const KEEP = (k) => k === KEY || k === 'threads.pins.v1' || k === 'threads.settings.v1' || k.startsWith('threads.edition.');
+export function backup() {
+  const out = { format: 'threads-backup-1', made: new Date().toISOString(), items: {} };
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && KEEP(k)) out.items[k] = localStorage.getItem(k);
+    }
+  } catch { /* storage unavailable */ }
+  return JSON.stringify(out, null, 2);
+}
+// Merges a backup (or a single exported trail) into this device. Existing trails with the same id are kept;
+// new ones are added. Pins merge per claim; edition references and settings from the file replace these.
+export function restore(text) {
+  const d = JSON.parse(text);
+  const s = load();
+  let trailsAdded = 0; let other = 0;
+  const addTrail = (t) => {
+    if (!t || !Array.isArray(t.steps)) return;
+    if (s.trails.some((x) => x.id === t.id)) return;
+    s.trails.push({ id: t.id || newId(), name: t.name || 'Imported trail', created: t.created || Date.now(), steps: t.steps });
+    trailsAdded += 1;
+  };
+  if (d.format === 'threads-trail-1') addTrail(d);
+  else if (d.format === 'threads-backup-1' && d.items) {
+    for (const [k, v] of Object.entries(d.items)) {
+      if (!KEEP(k)) continue;
+      if (k === KEY) { try { for (const t of (JSON.parse(v).trails || [])) addTrail(t); } catch { /* skip */ } continue; }
+      try {
+        if (k === 'threads.pins.v1') {
+          const mine = JSON.parse(localStorage.getItem(k) || '{}'); const theirs = JSON.parse(v || '{}');
+          for (const [claim, c] of Object.entries(theirs)) {
+            const m = mine[claim] || { pins: [], removed: [] };
+            for (const p of c.pins || []) if (!m.pins.some((x) => x.label === p.label && x.as === p.as)) m.pins.push(p);
+            for (const r of c.removed || []) if (!m.removed.includes(r)) m.removed.push(r);
+            mine[claim] = m;
+          }
+          localStorage.setItem(k, JSON.stringify(mine));
+        } else localStorage.setItem(k, v);
+        other += 1;
+      } catch { /* storage unavailable */ }
+    }
+  } else throw new Error('This file is not a Threads backup or trail.');
+  save();
+  return { trailsAdded, other };
+}
+
 // ---------------- exports
 export function toJSON(t) { return JSON.stringify({ format: 'threads-trail-1', ...t }, null, 2); }
 

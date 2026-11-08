@@ -1,0 +1,28 @@
+# Decisions
+
+Small decisions made without asking, and every deviation from the specification, with the reason. Newest first within each section.
+
+## Deviations from the specification (for Barry to review)
+
+1. **Process.** Phase 0 (questions) and Phase 1 (plan and license table before code) were skipped, and Stages 1 to 3 were built together. The first part of the specification arrived without the process section, so the build ran as one pass. The license check was still done before any data was bundled (see `build/sources.json` and the README table). A retrospective plan with the risks is in `docs/PLAN.md`.
+2. **Claim test, Gal 3:13.** "Children bear their parents' guilt" surfaces Exod 20:5, Exod 34:7, Ezek 18:20 and Deut 24:16, but not Gal 3:13. The data links Gal 3:13 to the claim only through Torrey's entry "Bore the curse of" (one of the claim's four words) and a weak two-step cross-reference path (Ezek 18:20 to 1 Pet 2:24 to Gal 3:13). Writing the answer into the code would put the builder's judgment in place of the evidence, so the acceptance check fails and says why. Pin Gal 3:13 by hand when testing this claim.
+3. **Em dashes in Scripture.** Bible texts keep every character of their source: the BSB has 1,672 em dashes, Brenton 151, the SBLGNT 93. Changing them would alter the text and break the identical-rendering check. Everything Threads itself writes has none, and in non-biblical sources (Josephus, the Fathers, the topical indexes) an em dash is shown as a spaced hyphen. Say the word if you want a display option that changes them in Scripture too.
+4. **Ezra SIL.** Not on npm, and SIL's download site is blocked from the build environment. Noto Serif Hebrew (OFL) is bundled; Ezra SIL comes first in the font stack, so it is used wherever it is installed.
+5. **Datasets not reachable**: the Samaritan Pentateuch (no openly licensed digital text found), Etheridge's Targums, Charles's 1 Enoch and Jubilees, Yonge's Philo and Lightfoot's Apostolic Fathers (public domain, but no copy reachable from the build environment). Threads shows "no data" for them. Hand pins still know their tiers (1 Enoch is Tier 3, the Apostolic Fathers Tier 4).
+6. **Semantic domains** show "no data": MACULA's domains come from the United Bible Societies with no open license for redistribution.
+7. **GitHub Pages** serves the `gh-pages` branch, which mirrors `main`, because the Pages settings API is not reachable from here. Switch Pages to `main` in the repository settings if you prefer.
+
+## Decisions
+
+- **Versification.** Verse ids use English (KJV) numbering; Hebrew and Septuagint numbers are shown wherever they differ. The BSB follows its publisher's verse division (3 John has 14 verses; "the dragon stood on the shore" is Rev 12:17), as the BSB interlinear data does.
+- **Septuagint numbering** is found by matching each grid verse's Greek with Swete's own file within the same book, taking the copy nearest the previous match when a verse text repeats. The self-test checks every Psalm verse against STEPBible's TVTMS. Swete's transcription has no Greek at seven Psalm verses (44:7, 55:5, 64:2, 116:14, 118:4, 119:51, 136:23); Threads shows "no data" there.
+- **Cross-reference votes** are kept per direction; the score uses the larger count and the score panel shows both.
+- **Nave's quotation list** adds 20 points (N) to a link and marks it at least a clear allusion. It catches quotations made from the Hebrew that Septuagint word runs miss.
+- **Cross references are stored one file per chapter**, so the web and the claim test load only the chapters they need.
+- **Claim test rules** (all shown to the reader in the report): English word families with inflections, derived forms and irregular forms; kinship words for "parents"; the predicate after a modal counts 1.6 times; "all" counts fully only within three words of the predicate and not when it qualifies the predicate's own derived noun ("all the prophets"); coverage counts more than rarity; two-step graph spread from passages that carry more than one part of the claim; passages grouped by chapter; tension by negation rules. These rules are general, not tuned to any one claim's answer.
+- **Scroll locations** use Abegg's labels: a plain number is a column, f marks a fragment (f2ii is fragment 2, column ii). Sigla (4QDeut-j and so on) are written in for the eight scrolls Threads names in its notes and journeys; other scrolls show their number.
+- **Tap targets.** Buttons, chips and graph nodes are at least 44px. Words inside a line of Scripture are inline text and smaller; the same word is always reachable through the literal line, the word sheet and the keyboard. This follows the inline-target exception in WCAG 2.5.8.
+- **Design.** Black and gold, with gold reserved for Scripture and the threads between Scripture texts. The light mode is near-white paper with black ink, not cream. Gentium Book Plus for English Scripture and Gentium Plus for Greek give the translation and the original one voice; Atkinson Hyperlegible keeps small interface text clear. The constellation is always drawn as gold on black. The only animation is the glide of a node into the centre, and it is skipped when the device asks for reduced motion.
+- **Self-test fixtures** are read from the upstream files by `build/build_fixtures.py`, which shares no parsing code with the other build scripts.
+- **AI text** is written at build time, kept in `build/ai_content.json`, labelled "AI-generated" and drawn in a hatched box. It is never used in a score.
+- **Storage.** Trails, notes, pins, edition page references and settings stay on the device in local storage (wrapped in try/catch), with a JSON backup and restore on the Trails page.
