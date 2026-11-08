@@ -221,17 +221,18 @@ export async function renderReader(a, z) {
     for (const v of before.reverse()) list.prepend(await verseBlock(v, { ctx: true }));
     for (const v of after) list.append(await verseBlock(v, { ctx: true }));
   } }, 'Show 3 verses of context on each side');
-  setView(head, toggles, h('p', null, ctxBtn), list, nav(a, z));
+  setView(head, toggles, h('p', null, ctxBtn), list, nav(a, z, await D.chapters()));
   for (const v of vs) list.append(await verseBlock(v));
   Trail.record('passage', R.rangeOsis(a, z), R.rangeLabel(a, z));
 }
-function nav(a, z) {
+function nav(a, z, chs) {
   const [b, c] = R.parts(a);
-  const prev = c > 1 ? `${R.bookOsis(b)}.${c - 1}.1` : null;
-  const next = `${R.bookOsis(b)}.${R.parts(z)[1] + 1}.1`;
+  const [, cz] = R.parts(z);
+  const osis = R.bookOsis(b);
+  const last = (chs[osis] || []).length;
   return h('div', { class: 'row', style: 'margin-top:12px' },
-    prev ? h('a', { class: 'btn', href: `#/read/${R.bookOsis(b)}.${c - 1}` }, 'Previous chapter') : null,
-    h('a', { class: 'btn', href: `#/read/${R.bookOsis(b)}.${R.parts(z)[1] + 1}` }, 'Next chapter'));
+    c > 1 ? h('a', { class: 'btn', href: `#/read/${osis}.${c - 1}` }, 'Previous chapter') : null,
+    cz < last ? h('a', { class: 'btn', href: `#/read/${osis}.${cz + 1}` }, 'Next chapter') : null);
 }
 
 // --------------------------------------------------------------------- constellation
